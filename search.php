@@ -1,12 +1,12 @@
 <?php
-session_start();
+// REMOVED: session_start()
+// REMOVED: session check for lecturer
+// Now directly accessible without login
+
 include 'db.php';
 
-// Check if user is logged in and is a lecturer
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'lecturer') {
-    header("Location: login.php");
-    exit();
-}
+// Set default values (no session)
+$user_name = "Lecturer";
 
 // Get filter values
 $name = isset($_GET['student_name']) ? mysqli_real_escape_string($conn, trim($_GET['student_name'])) : '';
@@ -166,26 +166,6 @@ function getScoreClass($score) {
     if ($score >= 70) return "color: #2563eb; font-weight: 700;";
     if ($score >= 50) return "color: #d97706; font-weight: 700;";
     return "color: #dc2626; font-weight: 700;";
-}
-
-function getRatingText($score) {
-    if ($score === null) return "Not Evaluated";
-    if ($score >= 85) return "🌟 Excellent";
-    if ($score >= 70) return "👍 Good";
-    if ($score >= 50) return "📊 Average";
-    return "📈 Needs Improvement";
-}
-
-function getStatusBadge($score) {
-    if ($score === null) return "status-pending";
-    if ($score >= 50) return "status-passed";
-    return "status-failed";
-}
-
-function getStatusText($score) {
-    if ($score === null) return "⏳ Pending";
-    if ($score >= 50) return "✅ PASSED";
-    return "❌ FAILED";
 }
 
 function highlightKeyword($text, $keyword) {
@@ -734,7 +714,7 @@ $has_active_filters = !empty($name) || !empty($matric) || !empty($format) || !em
 <div class="header">
     <div class="header-brand">🎵 Audio<span>Poetry</span></div>
     <div class="header-user">
-        <span class="name">👋 <?php echo $_SESSION['user_name']; ?></span>
+        <span class="name">👋 <?php echo $user_name; ?></span>
         <a href="logout.php" class="logout">🚪 Logout</a>
     </div>
 </div>
@@ -956,12 +936,6 @@ $has_active_filters = !empty($name) || !empty($matric) || !empty($format) || !em
                             
                             $is_evaluated = ($row['status'] == 'evaluated');
                             $has_word_count = ($word_count !== null && $word_count > 0);
-                            
-                            // For result popup
-                            $rating = getRatingText($score);
-                            $color = getScoreColor($score);
-                            $statusClass = getStatusBadge($score);
-                            $statusText = getStatusText($score);
                         ?>
                             <tr>
                                 <td>
@@ -1086,22 +1060,6 @@ $has_active_filters = !empty($name) || !empty($matric) || !empty($format) || !em
 
     // Show result popup
     function showResult(submissionId) {
-        // Get the row data from the table
-        // Since we can't easily pass PHP data to JS, we'll fetch from the same page
-        // or we can store data in data attributes
-        
-        // Find the row with this submission_id
-        const rows = document.querySelectorAll('tbody tr');
-        let rowData = null;
-        
-        rows.forEach(row => {
-            // We need to find the row with matching submission_id
-            // Since we don't have submission_id in the row, we'll use a different approach
-            // Let's use fetch to get the data
-        });
-        
-        // For now, show a message that result is available
-        // In production, you'd make an AJAX call to get the result data
         const popup = document.getElementById('resultPopup');
         const content = document.getElementById('popupContent');
         
@@ -1111,21 +1069,23 @@ $has_active_filters = !empty($name) || !empty($matric) || !empty($format) || !em
         
         // Fetch result data via AJAX
         fetch('get_result.php?submission_id=' + submissionId)
-            .then(response => response.json())
-            .then(data => {
+            .then(function(response) {
+                return response.json();
+            })
+            .then(function(data) {
                 if (data.error) {
                     content.innerHTML = '<div style="text-align:center;padding:40px;color:#dc2626;">❌ ' + data.error + '</div>';
                     return;
                 }
                 
                 // Build the result display
-                const score = data.evaluation_score;
-                const color = getScoreColor(score);
-                const rating = getRatingText(score);
-                const statusClass = getStatusBadge(score);
-                const statusText = getStatusText(score);
+                var score = data.evaluation_score;
+                var color = getScoreColor(score);
+                var rating = getRatingText(score);
+                var statusClass = getStatusBadge(score);
+                var statusText = getStatusText(score);
                 
-                let html = '';
+                var html = '';
                 
                 // Score section
                 html += '<div class="score-section">';
@@ -1177,7 +1137,7 @@ $has_active_filters = !empty($name) || !empty($matric) || !empty($format) || !em
                 document.getElementById('popupTitle').textContent = '📊 Result for ' + (data.user_name || 'Student');
                 document.getElementById('popupSubtitle').textContent = '🎓 ' + (data.matric_no || '') + ' | Audio poetry evaluation';
             })
-            .catch(error => {
+            .catch(function(error) {
                 content.innerHTML = '<div style="text-align:center;padding:40px;color:#dc2626;">❌ Error loading result: ' + error + '</div>';
             });
     }
@@ -1200,9 +1160,9 @@ $has_active_filters = !empty($name) || !empty($matric) || !empty($format) || !em
         }
     });
     
-    // Helper functions for result display
+    // JavaScript helper functions
     function getScoreColor(score) {
-        if (score === null) return "#94a3b8";
+        if (score === null || score === undefined) return "#94a3b8";
         if (score >= 85) return "#16a34a";
         if (score >= 70) return "#2563eb";
         if (score >= 50) return "#d97706";
@@ -1210,7 +1170,7 @@ $has_active_filters = !empty($name) || !empty($matric) || !empty($format) || !em
     }
     
     function getRatingText(score) {
-        if (score === null) return "Not Evaluated";
+        if (score === null || score === undefined) return "Not Evaluated";
         if (score >= 85) return "🌟 Excellent";
         if (score >= 70) return "👍 Good";
         if (score >= 50) return "📊 Average";
@@ -1218,13 +1178,13 @@ $has_active_filters = !empty($name) || !empty($matric) || !empty($format) || !em
     }
     
     function getStatusBadge(score) {
-        if (score === null) return "status-pending";
+        if (score === null || score === undefined) return "status-pending";
         if (score >= 50) return "status-passed";
         return "status-failed";
     }
     
     function getStatusText(score) {
-        if (score === null) return "⏳ Pending";
+        if (score === null || score === undefined) return "⏳ Pending";
         if (score >= 50) return "✅ PASSED";
         return "❌ FAILED";
     }

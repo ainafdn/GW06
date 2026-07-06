@@ -1,11 +1,13 @@
 <?php
-session_start();
+// REMOVED: session_start()
+// REMOVED: session check for lecturer
+// Now directly accessible without login
+
 include 'db.php';
 
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'lecturer') {
-    header("Location: login.php");
-    exit();
-}
+// Set default values (no session)
+$user_name = "Lecturer";
+$user_id = 1; // Default lecturer ID
 
 // Get statistics
 $total_users = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) AS total FROM users"))['total'];
@@ -123,7 +125,7 @@ $top_performers = mysqli_query($conn, "
 <div class="header">
     <div class="header-brand">🎵 Audio<span>Poetry</span></div>
     <div class="header-user">
-        <span class="name">👋 <?php echo $_SESSION['user_name']; ?></span>
+        <span class="name">👋 <?php echo $user_name; ?></span>
         <a href="logout.php" class="logout">🚪 Logout</a>
     </div>
 </div>

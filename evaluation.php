@@ -1,13 +1,14 @@
 <?php
-session_start();
+// REMOVED: session_start()
+// REMOVED: session check for lecturer
+// Now directly accessible without login
+
 include 'db.php';
 
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'lecturer') {
-    header("Location: login.php");
-    exit();
-}
+// Set default values (no session)
+$user_name = "Lecturer";
+$evaluator_id = 1; // Default lecturer ID
 
-$evaluator_id = $_SESSION['user_id'];
 $error = "";
 $success = "";
 
@@ -353,7 +354,7 @@ function getGradeFromScore($score) {
 <div class="header">
     <div class="header-brand">🎵 Audio<span>Poetry</span></div>
     <div class="header-user">
-        <span class="name">👋 <?php echo $_SESSION['user_name']; ?></span>
+        <span class="name">👋 <?php echo $user_name; ?></span>
         <a href="logout.php" class="logout">🚪 Logout</a>
     </div>
 </div>
