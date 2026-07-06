@@ -10,7 +10,7 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'lecturer') {
 
 // Get filter values
 $name = isset($_GET['student_name']) ? mysqli_real_escape_string($conn, trim($_GET['student_name'])) : '';
-$email = isset($_GET['email']) ? mysqli_real_escape_string($conn, trim($_GET['email'])) : '';
+$matric = isset($_GET['matric_no']) ? mysqli_real_escape_string($conn, trim($_GET['matric_no'])) : '';
 $format = isset($_GET['file_format']) ? mysqli_real_escape_string($conn, trim($_GET['file_format'])) : '';
 $upload_date = isset($_GET['upload_date']) ? mysqli_real_escape_string($conn, trim($_GET['upload_date'])) : '';
 $status = isset($_GET['status']) ? mysqli_real_escape_string($conn, trim($_GET['status'])) : '';
@@ -28,10 +28,11 @@ $sql = "SELECT
             s.audio_file,
             s.file_format,
             s.file_size_kb,
+            s.docStu,
             s.upload_date,
             s.status,
             u.user_name,
-            u.email,
+            u.matric_no,
             m.ocr_text,
             m.word_count,
             m.audio_duration_sec,
@@ -48,8 +49,8 @@ $sql = "SELECT
 if (!empty($name)) {
     $sql .= " AND u.user_name LIKE '%$name%'";
 }
-if (!empty($email)) {
-    $sql .= " AND u.email LIKE '%$email%'";
+if (!empty($matric)) {
+    $sql .= " AND u.matric_no LIKE '%$matric%'";
 }
 if (!empty($format)) {
     $sql .= " AND s.file_format = '$format'";
@@ -83,26 +84,89 @@ if ($max_duration !== null) {
 $sql .= " ORDER BY s.upload_date DESC";
 
 // ============================================================
-// EXECUTE QUERY WITH DEBUGGING
+// EXECUTE QUERY
 // ============================================================
 $result = mysqli_query($conn, $sql);
 
-// Check for query errors
 if (!$result) {
     die("Query failed: " . mysqli_error($conn));
 }
 
-// Count results
 $total_rows = mysqli_num_rows($result);
 
 // ============================================================
 // HELPER FUNCTIONS
 // ============================================================
 function formatDuration($seconds) {
-    if (!$seconds) return "—";
+    if (!$seconds || $seconds == 0) return "—";
     $minutes = floor($seconds / 60);
     $secs = $seconds % 60;
     return $minutes . ":" . str_pad($secs, 2, '0', STR_PAD_LEFT);
+}
+
+function formatFileSize($kb) {
+    if (!$kb || $kb == 0) return "—";
+    if ($kb < 1024) {
+        return round($kb, 2) . " KB";
+    } else {
+        return round($kb / 1024, 2) . " MB";
+    }
+}
+
+function getFileIcon($filename) {
+    $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+    $icons = [
+        'pdf' => '📄',
+        'doc' => '📝',
+        'docx' => '📝',
+        'txt' => '📃',
+        'jpg' => '🖼️',
+        'jpeg' => '🖼️',
+        'png' => '🖼️',
+        'gif' => '🖼️',
+        'mp3' => '🎵',
+        'wav' => '🎵',
+        'm4a' => '🎵',
+        'ogg' => '🎵',
+    ];
+    return $icons[$ext] ?? '📎';
+}
+
+function getFileType($filename) {
+    $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+    $audio_exts = ['mp3', 'wav', 'm4a', 'ogg', 'flac', 'aac'];
+    $doc_exts = ['pdf', 'doc', 'docx', 'txt', 'rtf'];
+    $image_exts = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg'];
+    
+    if (in_array($ext, $audio_exts)) return 'audio';
+    if (in_array($ext, $doc_exts)) return 'document';
+    if (in_array($ext, $image_exts)) return 'image';
+    return 'other';
+}
+
+function getFileStatus($filepath) {
+    if (empty($filepath)) return 'none';
+    if (file_exists($filepath)) {
+        $size = filesize($filepath);
+        if ($size > 0) {
+            return 'exists';
+        } else {
+            return 'empty';
+        }
+    }
+    return 'missing';
+}
+
+function getFileSizeHuman($filepath) {
+    if (empty($filepath) || !file_exists($filepath)) return '—';
+    $bytes = filesize($filepath);
+    if ($bytes == 0) return '0 KB';
+    $kb = $bytes / 1024;
+    if ($kb < 1024) {
+        return round($kb, 2) . ' KB';
+    } else {
+        return round($kb / 1024, 2) . ' MB';
+    }
 }
 
 function getScoreClass($score) {
@@ -119,7 +183,7 @@ function highlightKeyword($text, $keyword) {
 }
 
 // Check if any filter is active
-$has_active_filters = !empty($name) || !empty($email) || !empty($format) || !empty($upload_date) || 
+$has_active_filters = !empty($name) || !empty($matric) || !empty($format) || !empty($upload_date) || 
                       !empty($status) || $min_score !== null || $max_score !== null || 
                       !empty($keyword) || $min_duration !== null || $max_duration !== null;
 ?>
@@ -133,7 +197,6 @@ $has_active_filters = !empty($name) || !empty($email) || !empty($format) || !emp
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Inter', sans-serif; background: #f1f5f9; color: #0f172a; }
 
-        /* Header */
         .header { background: linear-gradient(135deg, #0f172a, #1e293b); padding: 16px 40px; color: white; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
         .header-brand { font-size: 20px; font-weight: 800; letter-spacing: -0.5px; }
         .header-brand span { color: #60a5fa; }
@@ -142,20 +205,15 @@ $has_active_filters = !empty($name) || !empty($email) || !empty($format) || !emp
         .header-user .logout { color: #fca5a5; text-decoration: none; font-weight: 600; transition: color 0.2s; }
         .header-user .logout:hover { color: #f87171; }
 
-        /* Navigation */
         .nav { background: white; padding: 0 40px; display: flex; gap: 0; border-bottom: 1px solid #e2e8f0; box-shadow: 0 2px 10px rgba(0,0,0,0.04); overflow-x: auto; }
         .nav a { padding: 16px 24px; text-decoration: none; color: #475569; font-weight: 600; font-size: 14px; border-bottom: 3px solid transparent; transition: all 0.2s; white-space: nowrap; }
         .nav a:hover { color: #0f172a; background: #f8fafc; }
         .nav a.active { color: #0f172a; border-bottom-color: #3b82f6; background: #f8fafc; }
 
-        /* Container */
         .container { max-width: 1600px; margin: 32px auto; padding: 0 32px; }
         .page-title { font-size: 28px; font-weight: 800; color: #0f172a; letter-spacing: -0.5px; margin-bottom: 4px; }
         .page-subtitle { color: #64748b; font-size: 15px; margin-bottom: 28px; }
 
-        /* ============================================ */
-        /* SIDE BY SIDE LAYOUT */
-        /* ============================================ */
         .search-layout {
             display: grid;
             grid-template-columns: 420px 1fr;
@@ -163,7 +221,6 @@ $has_active_filters = !empty($name) || !empty($email) || !empty($format) || !emp
             align-items: start;
         }
 
-        /* Search Box - Left Column */
         .search-box { 
             background: white; 
             padding: 24px 24px; 
@@ -175,25 +232,14 @@ $has_active_filters = !empty($name) || !empty($email) || !empty($format) || !emp
             max-height: calc(100vh - 140px);
             overflow-y: auto;
         }
-        .search-box::-webkit-scrollbar {
-            width: 4px;
-        }
-        .search-box::-webkit-scrollbar-track {
-            background: #f1f5f9;
-            border-radius: 10px;
-        }
-        .search-box::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
-            border-radius: 10px;
-        }
-        .search-box::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8;
-        }
+        .search-box::-webkit-scrollbar { width: 4px; }
+        .search-box::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 10px; }
+        .search-box::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .search-box::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
         .search-title { font-size: 16px; font-weight: 700; color: #0f172a; margin-bottom: 2px; }
         .search-subtitle { color: #64748b; font-size: 12px; margin-bottom: 16px; }
 
-        /* Collapsible Sections - Compact */
         .collapsible-section { border: 1.5px solid #e2e8f0; border-radius: 10px; margin-bottom: 10px; overflow: hidden; transition: border-color 0.2s; }
         .collapsible-section:hover { border-color: #cbd5e1; }
         .collapsible-section.active { border-color: #3b82f6; }
@@ -249,7 +295,6 @@ $has_active_filters = !empty($name) || !empty($email) || !empty($format) || !emp
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* Filter Grid - Compact */
         .filter-grid { display: grid; grid-template-columns: 1fr; gap: 10px; padding-top: 10px; }
         .filter-group label { display: block; font-weight: 600; font-size: 10px; color: #64748b; margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.3px; }
         .filter-group input, .filter-group select { 
@@ -272,7 +317,6 @@ $has_active_filters = !empty($name) || !empty($email) || !empty($format) || !emp
         .filter-row-inline input { width: 42%; }
         .filter-row-inline span { color: #94a3b8; font-weight: 600; font-size: 12px; }
 
-        /* Search Actions - Compact */
         .search-actions { 
             display: flex; 
             gap: 8px; 
@@ -312,7 +356,6 @@ $has_active_filters = !empty($name) || !empty($email) || !empty($format) || !emp
         }
         .btn-reset:hover { background: #cbd5e1; }
 
-        /* Results - Right Column */
         .results { 
             background: white; 
             padding: 20px 24px; 
@@ -333,7 +376,6 @@ $has_active_filters = !empty($name) || !empty($email) || !empty($format) || !emp
         .results-count span { background: #e2e8f0; padding: 2px 12px; border-radius: 20px; font-size: 12px; color: #475569; margin-left: 6px; }
         .results-hint { color: #94a3b8; font-size: 12px; }
 
-        /* Table */
         table { width: 100%; border-collapse: collapse; font-size: 12px; }
         th { background: #f8fafc; padding: 10px 12px; text-align: left; border-bottom: 2px solid #e2e8f0; font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: 600; letter-spacing: 0.5px; }
         td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; color: #1e293b; font-size: 12px; }
@@ -341,9 +383,11 @@ $has_active_filters = !empty($name) || !empty($email) || !empty($format) || !emp
         tr:last-child td { border-bottom: none; }
 
         .student-name { font-weight: 600; color: #0f172a; }
+        .student-matric { color: #64748b; font-size: 11px; display: block; }
         .status-badge { padding: 3px 12px; border-radius: 20px; font-size: 11px; font-weight: 600; display: inline-block; }
         .status-evaluated { background: #dcfce7; color: #16a34a; }
         .status-pending { background: #fef3c7; color: #d97706; }
+        .no-data { color: #94a3b8; font-style: italic; }
 
         .btn-evaluate { 
             background: #0f172a; 
@@ -360,6 +404,100 @@ $has_active_filters = !empty($name) || !empty($email) || !empty($format) || !emp
             white-space: nowrap;
         }
         .btn-evaluate:hover { background: #1e293b; }
+        .btn-evaluate.btn-done { background: #22c55e; cursor: default; }
+        .btn-evaluate.btn-done:hover { background: #22c55e; }
+
+        .file-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 2px 8px 2px 4px;
+            border-radius: 4px;
+            font-size: 11px;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+        .file-item .icon { font-size: 14px; }
+        .file-item .name { 
+            max-width: 120px; 
+            overflow: hidden; 
+            text-overflow: ellipsis; 
+            white-space: nowrap;
+        }
+        .file-item .size { 
+            font-size: 9px; 
+            color: #94a3b8; 
+        }
+        .file-item .status-badge-file {
+            font-size: 8px;
+            padding: 1px 6px;
+            border-radius: 10px;
+            font-weight: 600;
+        }
+        .file-item .status-badge-file.exists {
+            background: #dcfce7;
+            color: #16a34a;
+        }
+        .file-item .status-badge-file.missing {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+        .file-item .status-badge-file.empty {
+            background: #fef3c7;
+            color: #d97706;
+        }
+        
+        .file-item.audio-item {
+            background: #f0fdf4;
+            color: #16a34a;
+        }
+        .file-item.audio-item:hover {
+            background: #dcfce7;
+        }
+        .file-item.doc-item {
+            background: #eff6ff;
+            color: #3b82f6;
+        }
+        .file-item.doc-item:hover {
+            background: #dbeafe;
+        }
+        .file-item.missing-item {
+            background: #f1f5f9;
+            color: #94a3b8;
+            cursor: not-allowed;
+        }
+
+        .files-cell {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .audio-player-mini {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+        .audio-player-mini audio {
+            height: 28px;
+            max-width: 130px;
+        }
+
+        .meta-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            font-size: 10px;
+            padding: 1px 8px;
+            border-radius: 12px;
+            background: #f1f5f9;
+            color: #475569;
+            font-weight: 500;
+        }
+        .meta-tag .icon { font-size: 11px; }
+        .meta-tag.has-data { background: #dcfce7; color: #16a34a; }
+        .meta-tag.no-data-tag { background: #f1f5f9; color: #94a3b8; }
 
         .no-results { text-align: center; padding: 60px 20px; color: #94a3b8; }
         .no-results h3 { font-size: 18px; color: #64748b; margin-bottom: 6px; }
@@ -368,25 +506,15 @@ $has_active_filters = !empty($name) || !empty($email) || !empty($format) || !emp
 
         mark { background: #fef3c7; padding: 0 3px; border-radius: 3px; }
 
-        /* Score styles */
         .score-high { color: #16a34a; font-weight: 700; }
         .score-mid-high { color: #2563eb; font-weight: 700; }
         .score-mid { color: #d97706; font-weight: 700; }
         .score-low { color: #dc2626; font-weight: 700; }
 
-        /* Responsive */
         @media (max-width: 1200px) {
-            .search-layout {
-                grid-template-columns: 1fr;
-            }
-            .search-box {
-                position: static;
-                max-height: none;
-                overflow-y: visible;
-            }
-            .filter-grid {
-                grid-template-columns: 1fr 1fr;
-            }
+            .search-layout { grid-template-columns: 1fr; }
+            .search-box { position: static; max-height: none; overflow-y: visible; }
+            .filter-grid { grid-template-columns: 1fr 1fr; }
         }
 
         @media (max-width: 768px) {
@@ -397,13 +525,14 @@ $has_active_filters = !empty($name) || !empty($email) || !empty($format) || !emp
             .search-box { padding: 16px; }
             .results { padding: 14px; }
             .filter-grid { grid-template-columns: 1fr; }
-            .filter-row-inline input { width: 42%; }
             .search-actions { flex-direction: column; }
             .btn-search, .btn-reset { width: 100%; text-align: center; }
             .page-title { font-size: 20px; }
             .page-subtitle { font-size: 13px; margin-bottom: 16px; }
             th, td { padding: 8px 10px; font-size: 11px; }
             .results-header { flex-direction: column; align-items: flex-start; }
+            .audio-player-mini audio { max-width: 80px; }
+            .file-item .name { max-width: 80px; }
         }
         @media (max-width: 480px) {
             table { font-size: 10px; }
@@ -411,6 +540,9 @@ $has_active_filters = !empty($name) || !empty($email) || !empty($format) || !emp
             .btn-evaluate { font-size: 10px; padding: 3px 10px; }
             .section-header { padding: 8px 12px; }
             .section-content { padding: 0 12px 12px 12px; }
+            .audio-player-mini audio { max-width: 60px; height: 24px; }
+            .file-item .name { max-width: 50px; }
+            .file-item { font-size: 9px; padding: 1px 4px; }
         }
     </style>
 </head>
@@ -434,9 +566,6 @@ $has_active_filters = !empty($name) || !empty($email) || !empty($format) || !emp
     <h1 class="page-title">🔍 Search Submissions</h1>
     <p class="page-subtitle">Filter and search audio poetry submissions</p>
 
-    <!-- ============================================ -->
-    <!-- SIDE BY SIDE LAYOUT                          -->
-    <!-- ============================================ -->
     <div class="search-layout">
 
         <!-- LEFT COLUMN: Search / Filter -->
@@ -448,7 +577,7 @@ $has_active_filters = !empty($name) || !empty($email) || !empty($format) || !emp
 
                 <!-- ABR: Attribute-Based Retrieval -->
                 <div class="collapsible-section <?php 
-                    $abr_active = !empty($name) || !empty($email) || !empty($format) || !empty($upload_date) || 
+                    $abr_active = !empty($name) || !empty($matric) || !empty($format) || !empty($upload_date) || 
                                   !empty($status) || $min_score !== null || $max_score !== null;
                     echo $abr_active ? 'active' : ''; 
                 ?>">
@@ -462,7 +591,7 @@ $has_active_filters = !empty($name) || !empty($email) || !empty($format) || !emp
                             <?php 
                             $abr_count = 0;
                             if (!empty($name)) $abr_count++;
-                            if (!empty($email)) $abr_count++;
+                            if (!empty($matric)) $abr_count++;
                             if (!empty($format)) $abr_count++;
                             if (!empty($upload_date)) $abr_count++;
                             if (!empty($status)) $abr_count++;
@@ -482,8 +611,8 @@ $has_active_filters = !empty($name) || !empty($email) || !empty($format) || !emp
                                 <input type="text" name="student_name" placeholder="e.g., Emily" value="<?php echo htmlspecialchars($name); ?>">
                             </div>
                             <div class="filter-group">
-                                <label>Email</label>
-                                <input type="text" name="email" placeholder="e.g., student@edu.com" value="<?php echo htmlspecialchars($email); ?>">
+                                <label>Matric Number</label>
+                                <input type="text" name="matric_no" placeholder="e.g., B0324" value="<?php echo htmlspecialchars($matric); ?>">
                             </div>
                             <div class="filter-group">
                                 <label>File Format</label>
@@ -578,7 +707,6 @@ $has_active_filters = !empty($name) || !empty($email) || !empty($format) || !emp
                     </div>
                 </div>
 
-                <!-- BUTTONS -->
                 <div class="search-actions">
                     <button type="submit" class="btn-search">🔍 Search</button>
                     <a href="search.php" class="btn-reset">↺ Reset</a>
@@ -599,30 +727,40 @@ $has_active_filters = !empty($name) || !empty($email) || !empty($format) || !emp
             </div>
 
             <?php if ($total_rows == 0) { ?>
-                <!-- NO RESULTS -->
                 <div class="no-results">
                     <h3>📭 No submissions found</h3>
                     <p>Try adjusting your filters or click <strong>Reset</strong> to see all submissions.</p>
                     <p class="tip">💡 Tip: Make sure there are submissions in the database.</p>
                 </div>
             <?php } else { ?>
-                <!-- RESULTS TABLE -->
                 <table>
                     <thead>
                         <tr>
                             <th>Student</th>
-                            <th>Format</th>
-                            <th>Date</th>
-                            <th>Duration</th>
+                            <th>Files</th>
+                            <th style="width:90px;">Duration</th>
+                            <th style="width:70px;">Words</th>
                             <th>Text Preview</th>
-                            <th>Score</th>
-                            <th>Status</th>
-                            <th style="text-align:center;">Action</th>
+                            <th style="width:60px;">Score</th>
+                            <th style="width:80px;">Status</th>
+                            <th style="text-align:center;width:80px;">Action</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php while ($row = mysqli_fetch_assoc($result)) { 
                             $score = $row['evaluation_score'];
+                            $duration = $row['audio_duration_sec'];
+                            $word_count = $row['word_count'];
+                            $audio_file = $row['audio_file'];
+                            $doc_file = $row['docStu'];
+                            $file_size = $row['file_size_kb'];
+                            
+                            // Check file status
+                            $audio_status = getFileStatus($audio_file);
+                            $doc_status = getFileStatus($doc_file);
+                            $audio_size = ($audio_status != 'none') ? getFileSizeHuman($audio_file) : '—';
+                            $doc_size = ($doc_status != 'none') ? getFileSizeHuman($doc_file) : '—';
+                            
                             if ($score !== null) {
                                 if ($score >= 85) $scoreClass = 'score-high';
                                 elseif ($score >= 70) $scoreClass = 'score-mid-high';
@@ -631,34 +769,99 @@ $has_active_filters = !empty($name) || !empty($email) || !empty($format) || !emp
                             } else {
                                 $scoreClass = '';
                             }
+                            
+                            $is_evaluated = ($row['status'] == 'evaluated');
+                            $has_word_count = ($word_count !== null && $word_count > 0);
                         ?>
                             <tr>
-                                <td><span class="student-name"><?php echo htmlspecialchars($row['user_name']); ?></span></td>
-                                <td><span style="font-weight:600;"><?php echo $row['file_format']; ?></span></td>
-                                <td><?php echo date("Y-m-d", strtotime($row['upload_date'])); ?></td>
-                                <td><?php echo formatDuration($row['audio_duration_sec']); ?></td>
+                                <td>
+                                    <span class="student-name"><?php echo htmlspecialchars($row['user_name']); ?></span>
+                                    <span class="student-matric">🎓 <?php echo htmlspecialchars($row['matric_no']); ?></span>
+                                </td>
+                                <td>
+                                    <div class="files-cell">
+                                        <!-- AUDIO FILE -->
+                                        <?php if ($audio_status == 'none') { ?>
+                                            <span class="no-data">— No audio</span>
+                                        <?php } else { 
+                                            $audio_class = ($audio_status == 'exists') ? 'audio-item' : 'missing-item';
+                                            $status_label = ($audio_status == 'exists') ? '✅' : ($audio_status == 'empty' ? '⚠️' : '❌');
+                                            $status_text = ($audio_status == 'exists') ? 'exists' : ($audio_status == 'empty' ? 'empty' : 'missing');
+                                        ?>
+                                            <div class="audio-player-mini">
+                                                <?php if ($audio_status == 'exists' && getFileType($audio_file) == 'audio') { ?>
+                                                    <audio controls preload="none">
+                                                        <source src="<?php echo $audio_file; ?>">
+                                                        Your browser does not support the audio element.
+                                                    </audio>
+                                                <?php } ?>
+                                                <a href="<?php echo $audio_file; ?>" target="_blank" class="file-item <?php echo $audio_class; ?>" <?php echo ($audio_status != 'exists') ? 'onclick="return false;"' : ''; ?>>
+                                                    <span class="icon"><?php echo getFileIcon($audio_file); ?></span>
+                                                    <span class="name"><?php echo basename($audio_file); ?></span>
+                                                    <span class="size"><?php echo $audio_size; ?></span>
+                                                    <span class="status-badge-file <?php echo $status_text; ?>"><?php echo $status_label; ?></span>
+                                                </a>
+                                            </div>
+                                        <?php } ?>
+                                        
+                                        <!-- DOCUMENT FILE -->
+                                        <?php if ($doc_status == 'none') { ?>
+                                            <span class="no-data">— No document</span>
+                                        <?php } else { 
+                                            $doc_class = ($doc_status == 'exists') ? 'doc-item' : 'missing-item';
+                                            $status_label = ($doc_status == 'exists') ? '✅' : ($doc_status == 'empty' ? '⚠️' : '❌');
+                                            $status_text = ($doc_status == 'exists') ? 'exists' : ($doc_status == 'empty' ? 'empty' : 'missing');
+                                        ?>
+                                            <a href="<?php echo $doc_file; ?>" target="_blank" class="file-item <?php echo $doc_class; ?>" <?php echo ($doc_status != 'exists') ? 'onclick="return false;"' : ''; ?>>
+                                                <span class="icon"><?php echo getFileIcon($doc_file); ?></span>
+                                                <span class="name"><?php echo basename($doc_file); ?></span>
+                                                <span class="size"><?php echo $doc_size; ?></span>
+                                                <span class="status-badge-file <?php echo $status_text; ?>"><?php echo $status_label; ?></span>
+                                            </a>
+                                        <?php } ?>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="meta-tag <?php echo $duration ? 'has-data' : 'no-data-tag'; ?>">
+                                        <span class="icon">⏱️</span> <?php echo formatDuration($duration); ?>
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="meta-tag <?php echo $has_word_count ? 'has-data' : 'no-data-tag'; ?>">
+                                        <span class="icon">📝</span> 
+                                        <?php echo $has_word_count ? $word_count : '—'; ?>
+                                    </span>
+                                </td>
                                 <td>
                                     <?php 
-                                    $text = $row['ocr_text'] ?? '—';
-                                    if (!empty($keyword) && !empty($text)) {
-                                        echo highlightKeyword(substr($text, 0, 80), $keyword) . (strlen($text) > 80 ? '...' : '');
+                                    $text = $row['ocr_text'] ?? '';
+                                    if (!empty($text)) {
+                                        if (!empty($keyword) && !empty($text)) {
+                                            echo highlightKeyword(substr($text, 0, 80), $keyword) . (strlen($text) > 80 ? '...' : '');
+                                        } else {
+                                            echo htmlspecialchars(substr($text, 0, 60)) . (strlen($text) > 60 ? '...' : '');
+                                        }
                                     } else {
-                                        echo htmlspecialchars(substr($text, 0, 60)) . (strlen($text) > 60 ? '...' : '');
+                                        echo '<span class="no-data">— No text</span>';
                                     }
                                     ?>
                                 </td>
                                 <td class="<?php echo $scoreClass; ?>">
-                                    <?php echo $score !== null ? $score : '—'; ?>
+                                    <?php echo $score !== null ? $score : '<span class="no-data">—</span>'; ?>
                                 </td>
                                 <td>
-                                    <span class="status-badge <?php echo $row['status'] == 'evaluated' ? 'status-evaluated' : 'status-pending'; ?>">
+                                    <span class="status-badge <?php echo $is_evaluated ? 'status-evaluated' : 'status-pending'; ?>">
                                         <?php echo ucfirst($row['status']); ?>
                                     </span>
                                 </td>
                                 <td style="text-align:center;">
-                                    <a href="evaluation.php?submission_id=<?php echo $row['submission_id']; ?>" class="btn-evaluate">
-                                        ⭐ Evaluate
-                                    </a>
+                                    <?php if ($is_evaluated) { ?>
+                                        <span class="btn-evaluate btn-done">✅ Done</span>
+                                    <?php } else { ?>
+                                        <a href="evaluation.php?submission_id=<?php echo $row['submission_id']; ?>" class="btn-evaluate">
+                                            ⭐ Evaluate
+                                        </a>
+                                    <?php } ?>
                                 </td>
                             </tr>
                         <?php } ?>
@@ -672,16 +875,12 @@ $has_active_filters = !empty($name) || !empty($email) || !empty($format) || !emp
 </div>
 
 <script>
-    // Toggle collapsible sections
     function toggleSection(headerElement) {
         const section = headerElement.closest('.collapsible-section');
         section.classList.toggle('active');
     }
 
-    // Auto-expand sections with active filters on page load
-    document.addEventListener('DOMContentLoaded', function() {
-        // Sections are already set with 'active' class in PHP based on filters
-    });
+    document.addEventListener('DOMContentLoaded', function() {});
 </script>
 
 </body>

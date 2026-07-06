@@ -31,7 +31,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES['audio_file'])) {
             $error = "Please paste your poem text.";
         } else {
             // Count words more accurately for poetry using regex
-            // This counts words including apostrophes (we'll = 1 word)
             $word_count = preg_match_all('/\b[a-zA-Z\']+\b/', $poem_text, $matches);
             
             if ($word_count < 5) {
@@ -59,9 +58,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES['audio_file'])) {
 
                     $file_format = strtoupper($extension);
                     $file_size_kb = round($file['size'] / 1024, 2);
-                    
-                    // Use the word count calculated earlier
-                    // $word_count already calculated above
 
                     // Insert into submission table
                     $insert = "INSERT INTO submission (user_id, audio_file, file_format, file_size_kb, status) 
@@ -98,7 +94,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES['audio_file'])) {
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Inter', sans-serif; background: #f1f5f9; color: #0f172a; }
 
-        /* Header */
         .header { background: linear-gradient(135deg, #0f172a, #1e293b); padding: 16px 40px; color: white; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
         .header-brand { font-size: 20px; font-weight: 800; letter-spacing: -0.5px; }
         .header-brand span { color: #60a5fa; }
@@ -107,33 +102,27 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES['audio_file'])) {
         .header-user .logout { color: #fca5a5; text-decoration: none; font-weight: 600; transition: color 0.2s; }
         .header-user .logout:hover { color: #f87171; }
 
-        /* Navigation */
         .nav { background: white; padding: 0 40px; display: flex; gap: 0; border-bottom: 1px solid #e2e8f0; box-shadow: 0 2px 10px rgba(0,0,0,0.04); overflow-x: auto; }
         .nav a { padding: 16px 24px; text-decoration: none; color: #475569; font-weight: 600; font-size: 14px; border-bottom: 3px solid transparent; transition: all 0.2s; white-space: nowrap; }
         .nav a:hover { color: #0f172a; background: #f8fafc; }
         .nav a.active { color: #0f172a; border-bottom-color: #3b82f6; background: #f8fafc; }
 
-        /* Container */
         .container { max-width: 800px; margin: 32px auto; padding: 0 32px; }
 
-        /* Card */
         .card { background: white; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.06); overflow: hidden; }
         .card-header { background: linear-gradient(135deg, #0f172a, #1e293b); padding: 24px 32px; color: white; }
         .card-header h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
         .card-header .subtitle { font-size: 14px; color: #94a3b8; font-weight: 400; margin-top: 4px; }
         .card-body { padding: 32px; }
 
-        /* Alerts */
         .error { color: #b91c1c; padding: 14px 18px; background: #fee2e2; border-radius: 10px; margin-bottom: 20px; border-left: 5px solid #b91c1c; font-weight: 500; display: flex; align-items: center; gap: 8px; }
         .success { color: #15803d; padding: 14px 18px; background: #dcfce7; border-radius: 10px; margin-bottom: 20px; border-left: 5px solid #15803d; font-weight: 500; display: flex; align-items: center; gap: 8px; }
 
-        /* Info Box */
         .info-box { background: #eff6ff; padding: 20px 24px; border-radius: 12px; margin-bottom: 24px; border-left: 5px solid #3b82f6; }
         .info-box h4 { font-size: 15px; font-weight: 700; color: #0f172a; margin-bottom: 8px; }
         .info-box ul { margin: 8px 0 0 20px; padding-left: 4px; color: #475569; font-size: 14px; line-height: 1.8; }
         .info-box ul li strong { color: #0f172a; }
 
-        /* Form */
         .form-group { margin-top: 20px; }
         .form-group label { display: block; font-weight: 600; font-size: 14px; color: #0f172a; margin-bottom: 4px; }
         .form-group label .required { color: #ef4444; }
@@ -157,11 +146,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES['audio_file'])) {
         .form-group textarea { min-height: 150px; resize: vertical; line-height: 1.6; }
         .form-group small { display: block; color: #94a3b8; font-size: 12px; margin-top: 6px; }
         
-        /* File input custom styling */
-        .file-upload-wrapper {
-            position: relative;
-            width: 100%;
-        }
         .file-upload-wrapper input[type="file"] {
             padding: 12px;
             border: 2px dashed #e2e8f0;
@@ -227,7 +211,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES['audio_file'])) {
         .btn-submit:hover { background: #1e293b; }
         .btn-submit:active { transform: scale(0.98); }
 
-        /* Already Submitted */
         .already-submitted { text-align: center; padding: 30px 20px; }
         .already-submitted .icon { font-size: 64px; display: block; margin-bottom: 8px; }
         .already-submitted h3 { font-size: 22px; color: #0f172a; margin-bottom: 6px; }
@@ -245,7 +228,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES['audio_file'])) {
         }
         .already-submitted .btn-view:hover { background: #1e293b; }
 
-        /* Responsive */
         @media (max-width: 768px) {
             .header { padding: 12px 20px; flex-direction: column; gap: 8px; text-align: center; }
             .nav { padding: 0 16px; }
@@ -297,7 +279,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES['audio_file'])) {
         <div class="card-body">
 
             <?php if ($already_submitted) { ?>
-                <!-- Already Submitted -->
                 <div class="already-submitted">
                     <span class="icon">✅</span>
                     <h3>You have already submitted your audio!</h3>
@@ -323,7 +304,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES['audio_file'])) {
 
                     <form method="POST" enctype="multipart/form-data">
 
-                        <!-- Audio File -->
                         <div class="form-group">
                             <label>🎵 Audio File <span class="required">*</span></label>
                             <div class="file-upload-wrapper">
@@ -332,14 +312,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES['audio_file'])) {
                             <small>Max 25MB. Allowed: MP3, WAV, M4A, OGG</small>
                         </div>
 
-                        <!-- Poem Text -->
                         <div class="form-group">
                             <label>📝 Poem Text <span class="required">*</span></label>
                             <textarea name="poem_text" placeholder="Paste your full poem here..." required></textarea>
                             <small>This text will be used for keyword searching (TBR).</small>
                         </div>
 
-                        <!-- Duration -->
                         <div class="form-group">
                             <label>⏱️ Audio Duration (in seconds) <span class="required">*</span></label>
                             <input type="number" name="audio_duration" placeholder="e.g., 180 = 3 minutes" required min="1" max="600">

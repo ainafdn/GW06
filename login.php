@@ -5,22 +5,23 @@ include 'db.php';
 $error = "";
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $email = trim($_POST['email']);
-    $password = trim($_POST['password']);
+    $matric_no = trim($_POST['matric_no']);
     $role = trim($_POST['role']);
 
-    if (empty($email) || empty($password) || empty($role)) {
+    if (empty($matric_no) || empty($role)) {
         $error = "Please fill in all fields.";
     } else {
-        $sql = "SELECT * FROM users WHERE email = '$email' AND password = '$password' AND role = '$role' LIMIT 1";
+        // Query without password check
+        $sql = "SELECT * FROM users WHERE matric_no = '$matric_no' AND role = '$role' LIMIT 1";
         $result = mysqli_query($conn, $sql);
 
         if (mysqli_num_rows($result) == 1) {
             $user = mysqli_fetch_assoc($result);
             $_SESSION['user_id'] = $user['user_id'];
             $_SESSION['user_name'] = $user['user_name'];
-            $_SESSION['email'] = $user['email'];
+            $_SESSION['matric_no'] = $user['matric_no'];
             $_SESSION['role'] = $user['role'];
+            $_SESSION['email'] = $user['email'] ?? '';
 
             if ($user['role'] == 'student') {
                 header("Location: st_submission.php");
@@ -30,7 +31,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 exit();
             }
         } else {
-            $error = "Invalid email, password, or role.";
+            $error = "Invalid Matric Number or Role.";
         }
     }
 }
@@ -164,40 +165,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         .btn-login:hover { background: #1e293b; }
         .btn-login:active { transform: scale(0.98); }
         
-        .link { 
-            text-align: center; 
-            margin-top: 18px; 
-            font-size: 14px;
-            color: #64748b;
-        }
-        .link a { 
-            color: #3b82f6; 
-            text-decoration: none; 
-            font-weight: 600;
-            transition: color 0.2s;
-        }
-        .link a:hover { color: #2563eb; text-decoration: underline; }
-        
-        .divider {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            margin: 20px 0 4px 0;
-        }
-        .divider::before, .divider::after {
-            content: '';
-            flex: 1;
-            height: 1px;
-            background: #e2e8f0;
-        }
-        .divider span {
-            color: #94a3b8;
-            font-size: 12px;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
         .role-selector {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -232,6 +199,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             display: none;
         }
         
+        .note {
+            font-size: 12px;
+            color: #94a3b8;
+            text-align: center;
+            margin-top: 12px;
+        }
+        .note strong { color: #3b82f6; }
+        
         @media (max-width: 480px) {
             .container { padding: 32px 24px; }
             .logo h1 { font-size: 22px; }
@@ -244,20 +219,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         <div class="logo">
             <span class="logo-icon">🎵</span>
             <h1>Audio<span>Poetry</span></h1>
-            <div class="subtitle">Sign in to your account</div>
+            <div class="subtitle">Sign in with your Matric Number</div>
         </div>
 
         <?php if ($error) { echo "<div class='error'>❌ $error</div>"; } ?>
 
         <form method="POST" id="loginForm">
             <div class="form-group">
-                <label>Email Address <span class="required">*</span></label>
-                <input type="email" name="email" placeholder="your@email.com" required autofocus>
-            </div>
-
-            <div class="form-group">
-                <label>Password <span class="required">*</span></label>
-                <input type="password" name="password" placeholder="Enter your password" required>
+                <label>Matric Number <span class="required">*</span></label>
+                <input type="text" name="matric_no" placeholder="Enter your matric number e.g., B032420099" required autofocus>
             </div>
 
             <div class="form-group">
@@ -281,18 +251,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             <button type="submit" class="btn-login">🔐 Sign In</button>
         </form>
 
-        <div class="divider">
-            <span>New here?</span>
-        </div>
-
-        <div class="link">
-            <a href="register.php">Create an account →</a>
+        <div class="note">
+            ⚡ No password required. Just enter your <strong>Matric Number</strong>.
         </div>
     </div>
 
     <script>
         function selectRole(role) {
-            // Update visual selection
             const options = document.querySelectorAll('.role-option');
             options.forEach(opt => {
                 opt.classList.remove('selected');
@@ -300,12 +265,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     opt.classList.add('selected');
                 }
             });
-            
-            // Update hidden select
             document.getElementById('roleSelect').value = role;
         }
         
-        // Set initial role based on selected class
         document.addEventListener('DOMContentLoaded', function() {
             const selected = document.querySelector('.role-option.selected');
             if (selected) {

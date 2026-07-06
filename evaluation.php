@@ -63,7 +63,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 $sql = "SELECT 
             s.*,
             u.user_name,
-            u.email,
+            u.matric_no,
             m.audio_duration_sec,
             m.word_count,
             m.ocr_text,
@@ -238,24 +238,47 @@ function getGradeFromScore($score) {
 
         .text-preview { background: white; padding: 16px; border-radius: 10px; border: 1px solid #e2e8f0; max-height: 140px; overflow-y: auto; font-size: 14px; line-height: 1.7; color: #1e293b; margin-top: 10px; }
 
-        /* Auto-Suggest Box */
-        .auto-box { background: #eff6ff; padding: 24px; border-radius: 12px; margin: 16px 0; border: 2px solid #3b82f6; }
+        /* Auto-Suggest Box - Auto Accept (No Buttons) */
+        .auto-box { 
+            background: #f0fdf4; 
+            padding: 24px; 
+            border-radius: 12px; 
+            margin: 16px 0; 
+            border: 2px solid #22c55e;
+            position: relative;
+        }
+        .auto-box::before {
+            content: '✅ Auto-Accepted';
+            position: absolute;
+            top: -10px;
+            right: 20px;
+            background: #22c55e;
+            color: white;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 14px;
+            border-radius: 20px;
+            letter-spacing: 0.5px;
+        }
         .auto-box h3 { font-size: 16px; font-weight: 700; color: #0f172a; margin-bottom: 12px; }
         .auto-box .flex { display: flex; align-items: flex-start; gap: 30px; flex-wrap: wrap; }
         .auto-box .score-display { text-align: center; min-width: 140px; }
-        .auto-box .score-number { font-size: 48px; font-weight: 800; color: #0f172a; letter-spacing: -1px; line-height: 1; }
+        .auto-box .score-number { font-size: 48px; font-weight: 800; color: #16a34a; letter-spacing: -1px; line-height: 1; }
         .auto-box .score-grade { font-size: 16px; font-weight: 600; color: #475569; margin-top: 4px; }
         .auto-box .details { font-size: 13px; color: #475569; flex: 1; }
         .auto-box .details ul { margin: 8px 0 0 20px; padding-left: 4px; }
         .auto-box .details li { margin-bottom: 2px; }
         .auto-box .details .note { font-size: 12px; color: #94a3b8; margin-top: 6px; }
-        .auto-actions { display: flex; gap: 12px; margin-top: 16px; flex-wrap: wrap; }
-        .btn-accept { background: #22c55e; color: white; padding: 10px 28px; border: none; border-radius: 8px; font-weight: 700; font-size: 14px; cursor: pointer; transition: background 0.2s; }
-        .btn-accept:hover { background: #16a34a; }
-        .btn-accept:active { transform: scale(0.97); }
-        .btn-reject { background: #e2e8f0; color: #475569; padding: 10px 28px; border: none; border-radius: 8px; font-weight: 700; font-size: 14px; cursor: pointer; transition: background 0.2s; }
-        .btn-reject:hover { background: #cbd5e1; }
-        .btn-reject:active { transform: scale(0.97); }
+        .auto-box .auto-badge {
+            display: inline-block;
+            padding: 4px 16px;
+            background: #dcfce7;
+            color: #16a34a;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-top: 10px;
+        }
 
         /* Form */
         label { display: block; font-weight: 600; font-size: 14px; color: #0f172a; margin-top: 18px; }
@@ -281,6 +304,24 @@ function getGradeFromScore($score) {
         .current-result .item .label { font-size: 11px; font-weight: 600; color: #94a3b8; text-transform: uppercase; }
         .current-result .item .value { font-size: 15px; font-weight: 600; color: #0f172a; }
 
+        .matric-badge {
+            display: inline-block;
+            padding: 2px 12px;
+            background: #e2e8f0;
+            border-radius: 12px;
+            font-size: 13px;
+            color: #475569;
+            font-weight: 600;
+        }
+
+        .score-disabled {
+            background: #f0fdf4 !important;
+            border-color: #22c55e !important;
+            color: #16a34a !important;
+            font-weight: 700 !important;
+            cursor: not-allowed;
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
             .header { padding: 12px 20px; flex-direction: column; gap: 8px; text-align: center; }
@@ -296,12 +337,14 @@ function getGradeFromScore($score) {
             .current-result .grid { grid-template-columns: 1fr; }
             .btn-group { flex-direction: column; }
             .btn-save, .btn-back { width: 100%; text-align: center; }
+            .auto-box::before { right: 10px; font-size: 10px; padding: 2px 10px; }
         }
         @media (max-width: 480px) {
             .auto-box .score-number { font-size: 36px; }
             .section { padding: 16px; }
             .info-item { padding: 12px 14px; }
             .info-item .value { font-size: 14px; }
+            .auto-box::before { font-size: 9px; padding: 1px 8px; top: -8px; }
         }
     </style>
 </head>
@@ -326,7 +369,7 @@ function getGradeFromScore($score) {
     <div class="card">
         <div class="card-header">
             <h2>⭐ Evaluate Submission</h2>
-            <div class="subtitle">Provide score and feedback for student's audio poetry</div>
+            <div class="subtitle">Review and evaluate student's audio poetry</div>
         </div>
         <div class="card-body">
 
@@ -342,8 +385,8 @@ function getGradeFromScore($score) {
                         <div class="value"><?php echo htmlspecialchars($submission['user_name']); ?></div>
                     </div>
                     <div class="info-item">
-                        <div class="label">Email</div>
-                        <div class="value"><?php echo htmlspecialchars($submission['email']); ?></div>
+                        <div class="label">Matric Number</div>
+                        <div class="value"><span class="matric-badge"><?php echo htmlspecialchars($submission['matric_no']); ?></span></div>
                     </div>
                     <div class="info-item">
                         <div class="label">Submission ID</div>
@@ -388,13 +431,14 @@ function getGradeFromScore($score) {
                 <?php } ?>
             </div>
 
-            <!-- Auto-Suggest Score -->
+            <!-- Auto-Suggest Score - Auto Accepted (No Buttons) -->
             <div class="auto-box">
                 <h3>🤖 Auto-Suggested Score</h3>
                 <div class="flex">
                     <div class="score-display">
                         <div class="score-number"><?php echo $auto_score; ?> / 100</div>
                         <div class="score-grade">Grade: <strong><?php echo getGradeFromScore($auto_score); ?></strong></div>
+                        <span class="auto-badge">✅ Auto-Accepted</span>
                     </div>
                     <div class="details">
                         <strong>Based on:</strong>
@@ -406,14 +450,6 @@ function getGradeFromScore($score) {
                         <div class="note">💡 Maximum: 100 points (Duration 30 + Word Count 35 + File Size 20 + Format 15)</div>
                     </div>
                 </div>
-                <div class="auto-actions">
-                    <button type="button" class="btn-accept" onclick="acceptAutoScore()">
-                        ✅ Accept Suggested Score
-                    </button>
-                    <button type="button" class="btn-reject" onclick="rejectAutoScore()">
-                        ✏️ Enter Manually
-                    </button>
-                </div>
             </div>
 
             <!-- Evaluation Form -->
@@ -422,8 +458,10 @@ function getGradeFromScore($score) {
                 <label>📊 Evaluation Score <span class="required">*</span></label>
                 <input type="number" name="evaluation_score" id="scoreInput" 
                        min="0" max="100" step="0.01" 
-                       value="<?php echo $submission['evaluation_score'] !== null ? $submission['evaluation_score'] : $auto_score; ?>" 
-                       required placeholder="Enter score between 0-100">
+                       value="<?php echo $auto_score; ?>" 
+                       required placeholder="Enter score between 0-100"
+                       class="score-disabled"
+                       readonly>
 
                 <label>💬 Remarks / Feedback</label>
                 <textarea name="remarks" rows="4" placeholder="Provide feedback to the student..."><?php echo htmlspecialchars($submission['remarks'] ?? ''); ?></textarea>
@@ -459,35 +497,6 @@ function getGradeFromScore($score) {
     </div>
 
 </div>
-
-<script>
-    const scoreInput = document.getElementById('scoreInput');
-    const autoScore = <?php echo $auto_score; ?>;
-
-    function acceptAutoScore() {
-        scoreInput.value = autoScore;
-        scoreInput.style.borderColor = '#22c55e';
-        scoreInput.style.backgroundColor = '#f0fdf4';
-        setTimeout(() => {
-            scoreInput.style.borderColor = '';
-            scoreInput.style.backgroundColor = '';
-        }, 2000);
-    }
-
-    function rejectAutoScore() {
-        scoreInput.value = '';
-        scoreInput.focus();
-        scoreInput.style.borderColor = '#ef4444';
-        scoreInput.style.backgroundColor = '#fef2f2';
-        setTimeout(() => {
-            scoreInput.style.borderColor = '';
-            scoreInput.style.backgroundColor = '';
-        }, 1500);
-    }
-
-    window.acceptAutoScore = acceptAutoScore;
-    window.rejectAutoScore = rejectAutoScore;
-</script>
 
 </body>
 </html>

@@ -2,7 +2,6 @@
 session_start();
 include 'db.php';
 
-// Check if user is logged in and is a student
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'student') {
     header("Location: login.php");
     exit();
@@ -10,7 +9,6 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'student') {
 
 $user_id = $_SESSION['user_id'];
 
-// Get student's submission with evaluation results
 $sql = "SELECT 
             s.submission_id,
             s.audio_file,
@@ -19,7 +17,7 @@ $sql = "SELECT
             s.upload_date,
             s.status,
             u.user_name,
-            u.email,
+            u.matric_no,
             m.ocr_text,
             m.word_count,
             m.audio_duration_sec,
@@ -90,7 +88,6 @@ function formatDuration($seconds) {
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Inter', sans-serif; background: #f1f5f9; color: #0f172a; }
 
-        /* Header */
         .header { background: linear-gradient(135deg, #0f172a, #1e293b); padding: 16px 40px; color: white; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
         .header-brand { font-size: 20px; font-weight: 800; letter-spacing: -0.5px; }
         .header-brand span { color: #60a5fa; }
@@ -99,25 +96,21 @@ function formatDuration($seconds) {
         .header-user .logout { color: #fca5a5; text-decoration: none; font-weight: 600; transition: color 0.2s; }
         .header-user .logout:hover { color: #f87171; }
 
-        /* Navigation */
         .nav { background: white; padding: 0 40px; display: flex; gap: 0; border-bottom: 1px solid #e2e8f0; box-shadow: 0 2px 10px rgba(0,0,0,0.04); overflow-x: auto; }
         .nav a { padding: 16px 24px; text-decoration: none; color: #475569; font-weight: 600; font-size: 14px; border-bottom: 3px solid transparent; transition: all 0.2s; white-space: nowrap; }
         .nav a:hover { color: #0f172a; background: #f8fafc; }
         .nav a.active { color: #0f172a; border-bottom-color: #3b82f6; background: #f8fafc; }
 
-        /* Container */
         .container { max-width: 900px; margin: 32px auto; padding: 0 32px; }
         .page-title { font-size: 26px; font-weight: 800; color: #0f172a; letter-spacing: -0.5px; margin-bottom: 4px; }
         .page-subtitle { color: #64748b; font-size: 15px; margin-bottom: 24px; }
 
-        /* Card */
         .card { background: white; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.06); overflow: hidden; }
         .card-header { background: linear-gradient(135deg, #0f172a, #1e293b); padding: 24px 32px; color: white; }
         .card-header h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
         .card-header .subtitle { font-size: 14px; color: #94a3b8; font-weight: 400; margin-top: 4px; }
         .card-body { padding: 32px; }
 
-        /* Empty State */
         .empty { text-align: center; padding: 50px 20px; }
         .empty .icon { font-size: 64px; display: block; margin-bottom: 12px; }
         .empty h3 { font-size: 22px; color: #0f172a; margin-bottom: 6px; }
@@ -154,7 +147,6 @@ function formatDuration($seconds) {
             font-size: 13px;
         }
 
-        /* Score Section */
         .score-section { 
             text-align: center; 
             padding: 32px; 
@@ -188,7 +180,6 @@ function formatDuration($seconds) {
             margin-top: 8px;
         }
 
-        /* Status Badge */
         .status-container { text-align: center; margin: 12px 0 20px 0; }
         .status-badge { 
             display: inline-block; 
@@ -202,7 +193,6 @@ function formatDuration($seconds) {
         .status-failed { background: #fee2e2; color: #991b1b; }
         .status-pending { background: #fef3c7; color: #92400e; }
 
-        /* Info Grid */
         .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0; }
         .info-item { 
             background: #f8fafc; 
@@ -235,10 +225,8 @@ function formatDuration($seconds) {
             font-size: 15px;
         }
 
-        /* Full width item for poem text */
         .info-item.full-width { grid-column: 1 / -1; }
 
-        /* Poem Text Box */
         .poem-box {
             background: #f8fafc;
             padding: 14px 18px;
@@ -268,7 +256,6 @@ function formatDuration($seconds) {
             background: #94a3b8;
         }
 
-        /* Remarks Box */
         .remarks-box { 
             background: #eff6ff; 
             padding: 20px 24px; 
@@ -289,10 +276,8 @@ function formatDuration($seconds) {
             font-size: 14px;
         }
 
-        /* Divider */
         .divider { border: none; border-top: 2px solid #e2e8f0; margin: 24px 0; }
 
-        /* Footer Note */
         .footer-note { 
             font-size: 13px; 
             color: #94a3b8; 
@@ -304,7 +289,6 @@ function formatDuration($seconds) {
         }
         .footer-note .icon { font-size: 16px; }
 
-        /* Responsive */
         @media (max-width: 768px) {
             .header { padding: 12px 20px; flex-direction: column; gap: 8px; text-align: center; }
             .nav { padding: 0 16px; }
@@ -359,7 +343,6 @@ function formatDuration($seconds) {
         <div class="card-body">
 
             <?php if (!$data) { ?>
-                <!-- Case 1: No submission found -->
                 <div class="empty">
                     <span class="icon">📭</span>
                     <h3>No submission found</h3>
@@ -368,7 +351,6 @@ function formatDuration($seconds) {
                 </div>
 
             <?php } elseif ($data['evaluation_score'] === null) { ?>
-                <!-- Case 2: Submission exists but not evaluated yet -->
                 <div class="empty">
                     <span class="icon">⏳</span>
                     <h3>Result Pending</h3>
@@ -381,7 +363,6 @@ function formatDuration($seconds) {
                 </div>
 
             <?php } else { 
-                // Case 3: Evaluated! Show results
                 $score = $data['evaluation_score'];
                 $rating = getRatingText($score);
                 $color = getScoreColor($score);
@@ -389,7 +370,6 @@ function formatDuration($seconds) {
                 $statusText = getStatusText($score);
             ?>
 
-                <!-- Score Display -->
                 <div class="score-section">
                     <div class="label">🎯 Evaluation Score</div>
                     <div class="value" style="color: <?php echo $color; ?>">
@@ -401,14 +381,12 @@ function formatDuration($seconds) {
                     <div class="sub-text">Based on quality, content, and delivery</div>
                 </div>
 
-                <!-- Pass/Fail Status -->
                 <div class="status-container">
                     <span class="status-badge <?php echo $statusClass; ?>">
                         <?php echo $statusText; ?>
                     </span>
                 </div>
 
-                <!-- Submission Details -->
                 <div class="info-grid">
                     <div class="info-item">
                         <div class="label">Submission ID</div>
@@ -445,7 +423,6 @@ function formatDuration($seconds) {
                         <div class="value">📅 <?php echo date("F d, Y h:i A", strtotime($data['evaluated_at'])); ?></div>
                     </div>
 
-                    <!-- Poem Text - Full Width -->
                     <div class="info-item full-width">
                         <div class="label">📝 Poem Text</div>
                         <div class="poem-box">
@@ -460,7 +437,6 @@ function formatDuration($seconds) {
                     </div>
                 </div>
 
-                <!-- Lecturer Remarks -->
                 <?php if (!empty($data['remarks'])) { ?>
                     <div class="remarks-box">
                         <h4>💬 Lecturer Remarks</h4>
