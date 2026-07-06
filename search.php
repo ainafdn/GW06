@@ -38,11 +38,14 @@ $sql = "SELECT
             m.audio_duration_sec,
             e.evaluation_score,
             e.grade,
-            e.remarks
+            e.remarks,
+            e.evaluated_at,
+            lecturer.user_name AS evaluator_name
         FROM submission s
         JOIN users u ON s.user_id = u.user_id
         LEFT JOIN metadata m ON s.submission_id = m.submission_id
         LEFT JOIN evaluation e ON s.submission_id = e.submission_id
+        LEFT JOIN users lecturer ON e.evaluator_id = lecturer.user_id
         WHERE 1=1";
 
 // === ABR: Attribute-Based Retrieval ===
@@ -132,18 +135,6 @@ function getFileIcon($filename) {
     return $icons[$ext] ?? '📎';
 }
 
-function getFileType($filename) {
-    $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
-    $audio_exts = ['mp3', 'wav', 'm4a', 'ogg', 'flac', 'aac'];
-    $doc_exts = ['pdf', 'doc', 'docx', 'txt', 'rtf'];
-    $image_exts = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg'];
-    
-    if (in_array($ext, $audio_exts)) return 'audio';
-    if (in_array($ext, $doc_exts)) return 'document';
-    if (in_array($ext, $image_exts)) return 'image';
-    return 'other';
-}
-
 function getFileStatus($filepath) {
     if (empty($filepath)) return 'none';
     if (file_exists($filepath)) {
@@ -175,6 +166,26 @@ function getScoreClass($score) {
     if ($score >= 70) return "color: #2563eb; font-weight: 700;";
     if ($score >= 50) return "color: #d97706; font-weight: 700;";
     return "color: #dc2626; font-weight: 700;";
+}
+
+function getRatingText($score) {
+    if ($score === null) return "Not Evaluated";
+    if ($score >= 85) return "🌟 Excellent";
+    if ($score >= 70) return "👍 Good";
+    if ($score >= 50) return "📊 Average";
+    return "📈 Needs Improvement";
+}
+
+function getStatusBadge($score) {
+    if ($score === null) return "status-pending";
+    if ($score >= 50) return "status-passed";
+    return "status-failed";
+}
+
+function getStatusText($score) {
+    if ($score === null) return "⏳ Pending";
+    if ($score >= 50) return "✅ PASSED";
+    return "❌ FAILED";
 }
 
 function highlightKeyword($text, $keyword) {
@@ -407,19 +418,20 @@ $has_active_filters = !empty($name) || !empty($matric) || !empty($format) || !em
         .btn-evaluate.btn-done { background: #22c55e; cursor: default; }
         .btn-evaluate.btn-done:hover { background: #22c55e; }
 
+        /* File items - separated */
         .file-item {
-            display: flex;
+            display: inline-flex;
             align-items: center;
-            gap: 6px;
+            gap: 4px;
             padding: 2px 8px 2px 4px;
             border-radius: 4px;
             font-size: 11px;
             text-decoration: none;
             transition: all 0.2s;
         }
-        .file-item .icon { font-size: 14px; }
+        .file-item .icon { font-size: 13px; }
         .file-item .name { 
-            max-width: 120px; 
+            max-width: 100px; 
             overflow: hidden; 
             text-overflow: ellipsis; 
             white-space: nowrap;
@@ -434,43 +446,33 @@ $has_active_filters = !empty($name) || !empty($matric) || !empty($format) || !em
             border-radius: 10px;
             font-weight: 600;
         }
-        .file-item .status-badge-file.exists {
-            background: #dcfce7;
-            color: #16a34a;
-        }
-        .file-item .status-badge-file.missing {
-            background: #fee2e2;
-            color: #dc2626;
-        }
-        .file-item .status-badge-file.empty {
-            background: #fef3c7;
-            color: #d97706;
-        }
+        .file-item .status-badge-file.exists { background: #dcfce7; color: #16a34a; }
+        .file-item .status-badge-file.missing { background: #fee2e2; color: #dc2626; }
+        .file-item .status-badge-file.empty { background: #fef3c7; color: #d97706; }
         
-        .file-item.audio-item {
-            background: #f0fdf4;
-            color: #16a34a;
-        }
-        .file-item.audio-item:hover {
-            background: #dcfce7;
-        }
-        .file-item.doc-item {
-            background: #eff6ff;
-            color: #3b82f6;
-        }
-        .file-item.doc-item:hover {
-            background: #dbeafe;
-        }
-        .file-item.missing-item {
-            background: #f1f5f9;
-            color: #94a3b8;
-            cursor: not-allowed;
-        }
+        .file-item.audio-item { background: #f0fdf4; color: #16a34a; }
+        .file-item.audio-item:hover { background: #dcfce7; }
+        .file-item.doc-item { background: #eff6ff; color: #3b82f6; }
+        .file-item.doc-item:hover { background: #dbeafe; }
+        .file-item.missing-item { background: #f1f5f9; color: #94a3b8; cursor: not-allowed; }
 
         .files-cell {
             display: flex;
             flex-direction: column;
+            gap: 3px;
+        }
+        .files-row {
+            display: flex;
+            align-items: center;
             gap: 4px;
+            flex-wrap: wrap;
+        }
+        .files-label {
+            font-size: 9px;
+            font-weight: 600;
+            color: #94a3b8;
+            width: 40px;
+            flex-shrink: 0;
         }
 
         .audio-player-mini {
@@ -480,8 +482,8 @@ $has_active_filters = !empty($name) || !empty($matric) || !empty($format) || !em
             flex-wrap: wrap;
         }
         .audio-player-mini audio {
-            height: 28px;
-            max-width: 130px;
+            height: 26px;
+            max-width: 100px;
         }
 
         .meta-tag {
@@ -498,6 +500,181 @@ $has_active_filters = !empty($name) || !empty($matric) || !empty($format) || !em
         .meta-tag .icon { font-size: 11px; }
         .meta-tag.has-data { background: #dcfce7; color: #16a34a; }
         .meta-tag.no-data-tag { background: #f1f5f9; color: #94a3b8; }
+
+        /* Result popup / modal */
+        .result-popup {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 999;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .result-popup.active { display: flex; }
+        .result-popup .modal {
+            background: white;
+            max-width: 700px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            border-radius: 16px;
+            padding: 32px;
+            position: relative;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .result-popup .modal .close-btn {
+            position: absolute;
+            top: 16px;
+            right: 20px;
+            font-size: 24px;
+            cursor: pointer;
+            color: #94a3b8;
+            background: none;
+            border: none;
+            transition: color 0.2s;
+        }
+        .result-popup .modal .close-btn:hover { color: #0f172a; }
+        .result-popup .modal h2 { 
+            font-size: 22px; 
+            font-weight: 800; 
+            color: #0f172a; 
+            margin-bottom: 4px;
+            letter-spacing: -0.5px;
+        }
+        .result-popup .modal .subtitle { 
+            color: #64748b; 
+            font-size: 14px; 
+            margin-bottom: 20px; 
+        }
+        .result-popup .modal .score-section { 
+            text-align: center; 
+            padding: 24px; 
+            background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+            border-radius: 12px; 
+            margin: 12px 0 16px 0;
+            border: 2px solid #e2e8f0;
+        }
+        .result-popup .modal .score-section .label { 
+            color: #64748b; 
+            font-size: 13px; 
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .result-popup .modal .score-section .value { 
+            font-size: 48px; 
+            font-weight: 800; 
+            letter-spacing: -2px;
+            line-height: 1.1;
+        }
+        .result-popup .modal .score-section .rating { 
+            font-size: 18px; 
+            font-weight: 700; 
+            margin-top: 2px; 
+        }
+        .result-popup .modal .score-section .sub-text {
+            font-size: 13px;
+            color: #94a3b8;
+            margin-top: 6px;
+        }
+        .result-popup .modal .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin: 16px 0;
+        }
+        .result-popup .modal .info-item {
+            background: #f8fafc;
+            padding: 12px 16px;
+            border-radius: 10px;
+            border-left: 3px solid #3b82f6;
+        }
+        .result-popup .modal .info-item .label {
+            font-size: 10px;
+            font-weight: 600;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .result-popup .modal .info-item .value {
+            font-size: 14px;
+            font-weight: 600;
+            color: #0f172a;
+            margin-top: 2px;
+        }
+        .result-popup .modal .info-item .value .grade-badge {
+            display: inline-block;
+            padding: 2px 12px;
+            border-radius: 16px;
+            background: #0f172a;
+            color: white;
+            font-weight: 700;
+            font-size: 13px;
+        }
+        .result-popup .modal .remarks-box {
+            background: #eff6ff;
+            padding: 16px 20px;
+            border-radius: 10px;
+            margin-top: 12px;
+            border-left: 4px solid #3b82f6;
+        }
+        .result-popup .modal .remarks-box h4 {
+            font-size: 13px;
+            font-weight: 700;
+            color: #0f172a;
+            margin-bottom: 4px;
+        }
+        .result-popup .modal .remarks-box p {
+            line-height: 1.6;
+            margin: 0;
+            color: #1e293b;
+            font-size: 13px;
+        }
+        .result-popup .modal .status-container {
+            text-align: center;
+            margin: 8px 0 12px 0;
+        }
+        .result-popup .modal .status-badge-result {
+            display: inline-block;
+            padding: 6px 24px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 14px;
+        }
+        .result-popup .modal .status-passed { background: #dcfce7; color: #166534; }
+        .result-popup .modal .status-failed { background: #fee2e2; color: #991b1b; }
+        .result-popup .modal .status-pending { background: #fef3c7; color: #92400e; }
+        .result-popup .modal .divider { border: none; border-top: 2px solid #e2e8f0; margin: 16px 0; }
+        .result-popup .modal .footer-note {
+            font-size: 12px;
+            color: #94a3b8;
+            text-align: center;
+        }
+
+        .btn-view-result {
+            background: #8b5cf6;
+            color: white;
+            padding: 4px 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 600;
+            transition: background 0.2s;
+            white-space: nowrap;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn-view-result:hover { background: #7c3aed; }
+
+        .btn-view-result.pending {
+            background: #e2e8f0;
+            color: #94a3b8;
+            cursor: not-allowed;
+        }
+        .btn-view-result.pending:hover { background: #e2e8f0; }
 
         .no-results { text-align: center; padding: 60px 20px; color: #94a3b8; }
         .no-results h3 { font-size: 18px; color: #64748b; margin-bottom: 6px; }
@@ -531,18 +708,24 @@ $has_active_filters = !empty($name) || !empty($matric) || !empty($format) || !em
             .page-subtitle { font-size: 13px; margin-bottom: 16px; }
             th, td { padding: 8px 10px; font-size: 11px; }
             .results-header { flex-direction: column; align-items: flex-start; }
-            .audio-player-mini audio { max-width: 80px; }
-            .file-item .name { max-width: 80px; }
+            .audio-player-mini audio { max-width: 70px; }
+            .file-item .name { max-width: 60px; }
+            .files-label { width: 30px; font-size: 8px; }
+            .result-popup .modal { padding: 20px; margin: 10px; }
+            .result-popup .modal .info-grid { grid-template-columns: 1fr; }
+            .result-popup .modal .score-section .value { font-size: 36px; }
         }
         @media (max-width: 480px) {
             table { font-size: 10px; }
             th, td { padding: 6px 8px; }
             .btn-evaluate { font-size: 10px; padding: 3px 10px; }
+            .btn-view-result { font-size: 10px; padding: 3px 8px; }
             .section-header { padding: 8px 12px; }
             .section-content { padding: 0 12px 12px 12px; }
-            .audio-player-mini audio { max-width: 60px; height: 24px; }
-            .file-item .name { max-width: 50px; }
+            .audio-player-mini audio { max-width: 50px; height: 22px; }
             .file-item { font-size: 9px; padding: 1px 4px; }
+            .file-item .name { max-width: 40px; }
+            .files-label { width: 25px; font-size: 7px; }
         }
     </style>
 </head>
@@ -737,13 +920,14 @@ $has_active_filters = !empty($name) || !empty($matric) || !empty($format) || !em
                     <thead>
                         <tr>
                             <th>Student</th>
-                            <th>Files</th>
-                            <th style="width:90px;">Duration</th>
-                            <th style="width:70px;">Words</th>
+                            <th>Audio</th>
+                            <th>Document</th>
+                            <th style="width:80px;">Duration</th>
+                            <th style="width:60px;">Words</th>
                             <th>Text Preview</th>
                             <th style="width:60px;">Score</th>
                             <th style="width:80px;">Status</th>
-                            <th style="text-align:center;width:80px;">Action</th>
+                            <th style="text-align:center;width:130px;">Action</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -772,6 +956,12 @@ $has_active_filters = !empty($name) || !empty($matric) || !empty($format) || !em
                             
                             $is_evaluated = ($row['status'] == 'evaluated');
                             $has_word_count = ($word_count !== null && $word_count > 0);
+                            
+                            // For result popup
+                            $rating = getRatingText($score);
+                            $color = getScoreColor($score);
+                            $statusClass = getStatusBadge($score);
+                            $statusText = getStatusText($score);
                         ?>
                             <tr>
                                 <td>
@@ -779,47 +969,43 @@ $has_active_filters = !empty($name) || !empty($matric) || !empty($format) || !em
                                     <span class="student-matric">🎓 <?php echo htmlspecialchars($row['matric_no']); ?></span>
                                 </td>
                                 <td>
-                                    <div class="files-cell">
-                                        <!-- AUDIO FILE -->
-                                        <?php if ($audio_status == 'none') { ?>
-                                            <span class="no-data">— No audio</span>
-                                        <?php } else { 
-                                            $audio_class = ($audio_status == 'exists') ? 'audio-item' : 'missing-item';
-                                            $status_label = ($audio_status == 'exists') ? '✅' : ($audio_status == 'empty' ? '⚠️' : '❌');
-                                            $status_text = ($audio_status == 'exists') ? 'exists' : ($audio_status == 'empty' ? 'empty' : 'missing');
-                                        ?>
-                                            <div class="audio-player-mini">
-                                                <?php if ($audio_status == 'exists' && getFileType($audio_file) == 'audio') { ?>
-                                                    <audio controls preload="none">
-                                                        <source src="<?php echo $audio_file; ?>">
-                                                        Your browser does not support the audio element.
-                                                    </audio>
-                                                <?php } ?>
-                                                <a href="<?php echo $audio_file; ?>" target="_blank" class="file-item <?php echo $audio_class; ?>" <?php echo ($audio_status != 'exists') ? 'onclick="return false;"' : ''; ?>>
-                                                    <span class="icon"><?php echo getFileIcon($audio_file); ?></span>
-                                                    <span class="name"><?php echo basename($audio_file); ?></span>
-                                                    <span class="size"><?php echo $audio_size; ?></span>
-                                                    <span class="status-badge-file <?php echo $status_text; ?>"><?php echo $status_label; ?></span>
-                                                </a>
-                                            </div>
-                                        <?php } ?>
-                                        
-                                        <!-- DOCUMENT FILE -->
-                                        <?php if ($doc_status == 'none') { ?>
-                                            <span class="no-data">— No document</span>
-                                        <?php } else { 
-                                            $doc_class = ($doc_status == 'exists') ? 'doc-item' : 'missing-item';
-                                            $status_label = ($doc_status == 'exists') ? '✅' : ($doc_status == 'empty' ? '⚠️' : '❌');
-                                            $status_text = ($doc_status == 'exists') ? 'exists' : ($doc_status == 'empty' ? 'empty' : 'missing');
-                                        ?>
-                                            <a href="<?php echo $doc_file; ?>" target="_blank" class="file-item <?php echo $doc_class; ?>" <?php echo ($doc_status != 'exists') ? 'onclick="return false;"' : ''; ?>>
-                                                <span class="icon"><?php echo getFileIcon($doc_file); ?></span>
-                                                <span class="name"><?php echo basename($doc_file); ?></span>
-                                                <span class="size"><?php echo $doc_size; ?></span>
+                                    <?php if ($audio_status == 'none') { ?>
+                                        <span class="no-data">—</span>
+                                    <?php } else { 
+                                        $audio_class = ($audio_status == 'exists') ? 'audio-item' : 'missing-item';
+                                        $status_label = ($audio_status == 'exists') ? '✅' : ($audio_status == 'empty' ? '⚠️' : '❌');
+                                        $status_text = ($audio_status == 'exists') ? 'exists' : ($audio_status == 'empty' ? 'empty' : 'missing');
+                                    ?>
+                                        <div class="audio-player-mini">
+                                            <?php if ($audio_status == 'exists') { ?>
+                                                <audio controls preload="none" style="max-width:80px;">
+                                                    <source src="<?php echo $audio_file; ?>">
+                                                </audio>
+                                            <?php } ?>
+                                            <a href="<?php echo $audio_file; ?>" target="_blank" class="file-item <?php echo $audio_class; ?>" <?php echo ($audio_status != 'exists') ? 'onclick="return false;"' : ''; ?>>
+                                                <span class="icon"><?php echo getFileIcon($audio_file); ?></span>
+                                                <span class="name"><?php echo basename($audio_file); ?></span>
+                                                <span class="size"><?php echo $audio_size; ?></span>
                                                 <span class="status-badge-file <?php echo $status_text; ?>"><?php echo $status_label; ?></span>
                                             </a>
-                                        <?php } ?>
-                                    </div>
+                                        </div>
+                                    <?php } ?>
+                                </td>
+                                <td>
+                                    <?php if ($doc_status == 'none') { ?>
+                                        <span class="no-data">—</span>
+                                    <?php } else { 
+                                        $doc_class = ($doc_status == 'exists') ? 'doc-item' : 'missing-item';
+                                        $status_label = ($doc_status == 'exists') ? '✅' : ($doc_status == 'empty' ? '⚠️' : '❌');
+                                        $status_text = ($doc_status == 'exists') ? 'exists' : ($doc_status == 'empty' ? 'empty' : 'missing');
+                                    ?>
+                                        <a href="<?php echo $doc_file; ?>" target="_blank" class="file-item <?php echo $doc_class; ?>" <?php echo ($doc_status != 'exists') ? 'onclick="return false;"' : ''; ?>>
+                                            <span class="icon"><?php echo getFileIcon($doc_file); ?></span>
+                                            <span class="name"><?php echo basename($doc_file); ?></span>
+                                            <span class="size"><?php echo $doc_size; ?></span>
+                                            <span class="status-badge-file <?php echo $status_text; ?>"><?php echo $status_label; ?></span>
+                                        </a>
+                                    <?php } ?>
                                 </td>
                                 <td>
                                     <span class="meta-tag <?php echo $duration ? 'has-data' : 'no-data-tag'; ?>">
@@ -842,7 +1028,7 @@ $has_active_filters = !empty($name) || !empty($matric) || !empty($format) || !em
                                             echo htmlspecialchars(substr($text, 0, 60)) . (strlen($text) > 60 ? '...' : '');
                                         }
                                     } else {
-                                        echo '<span class="no-data">— No text</span>';
+                                        echo '<span class="no-data">—</span>';
                                     }
                                     ?>
                                 </td>
@@ -855,13 +1041,17 @@ $has_active_filters = !empty($name) || !empty($matric) || !empty($format) || !em
                                     </span>
                                 </td>
                                 <td style="text-align:center;">
-                                    <?php if ($is_evaluated) { ?>
-                                        <span class="btn-evaluate btn-done">✅ Done</span>
-                                    <?php } else { ?>
-                                        <a href="evaluation.php?submission_id=<?php echo $row['submission_id']; ?>" class="btn-evaluate">
-                                            ⭐ Evaluate
-                                        </a>
-                                    <?php } ?>
+                                    <div style="display:flex; gap:4px; justify-content:center; flex-wrap:wrap;">
+                                        <?php if ($is_evaluated) { ?>
+                                            <button class="btn-view-result" onclick="showResult(<?php echo $row['submission_id']; ?>)">
+                                                📊 View Result
+                                            </button>
+                                        <?php } else { ?>
+                                            <a href="evaluation.php?submission_id=<?php echo $row['submission_id']; ?>" class="btn-evaluate">
+                                                ⭐ Evaluate
+                                            </a>
+                                        <?php } ?>
+                                    </div>
                                 </td>
                             </tr>
                         <?php } ?>
@@ -874,10 +1064,169 @@ $has_active_filters = !empty($name) || !empty($matric) || !empty($format) || !em
 
 </div>
 
+<!-- Result Popup Modal -->
+<div class="result-popup" id="resultPopup">
+    <div class="modal">
+        <button class="close-btn" onclick="closeResult()">&times;</button>
+        <h2 id="popupTitle">📊 Evaluation Result</h2>
+        <p class="subtitle" id="popupSubtitle">Student's audio poetry evaluation summary</p>
+        
+        <div id="popupContent">
+            <!-- Content loaded via JavaScript -->
+        </div>
+    </div>
+</div>
+
 <script>
+    // Toggle collapsible sections
     function toggleSection(headerElement) {
         const section = headerElement.closest('.collapsible-section');
         section.classList.toggle('active');
+    }
+
+    // Show result popup
+    function showResult(submissionId) {
+        // Get the row data from the table
+        // Since we can't easily pass PHP data to JS, we'll fetch from the same page
+        // or we can store data in data attributes
+        
+        // Find the row with this submission_id
+        const rows = document.querySelectorAll('tbody tr');
+        let rowData = null;
+        
+        rows.forEach(row => {
+            // We need to find the row with matching submission_id
+            // Since we don't have submission_id in the row, we'll use a different approach
+            // Let's use fetch to get the data
+        });
+        
+        // For now, show a message that result is available
+        // In production, you'd make an AJAX call to get the result data
+        const popup = document.getElementById('resultPopup');
+        const content = document.getElementById('popupContent');
+        
+        // Show loading
+        content.innerHTML = '<div style="text-align:center;padding:40px;">Loading result...</div>';
+        popup.classList.add('active');
+        
+        // Fetch result data via AJAX
+        fetch('get_result.php?submission_id=' + submissionId)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    content.innerHTML = '<div style="text-align:center;padding:40px;color:#dc2626;">❌ ' + data.error + '</div>';
+                    return;
+                }
+                
+                // Build the result display
+                const score = data.evaluation_score;
+                const color = getScoreColor(score);
+                const rating = getRatingText(score);
+                const statusClass = getStatusBadge(score);
+                const statusText = getStatusText(score);
+                
+                let html = '';
+                
+                // Score section
+                html += '<div class="score-section">';
+                html += '<div class="label">🎯 Evaluation Score</div>';
+                html += '<div class="value" style="color:' + color + '">' + score + '<span style="font-size:24px;font-weight:600;color:#94a3b8;"> / 100</span></div>';
+                html += '<div class="rating" style="color:' + color + '">' + rating + '</div>';
+                html += '<div class="sub-text">Based on quality, content, and delivery</div>';
+                html += '</div>';
+                
+                // Status
+                html += '<div class="status-container">';
+                html += '<span class="status-badge-result ' + statusClass + '">' + statusText + '</span>';
+                html += '</div>';
+                
+                // Info grid
+                html += '<div class="info-grid">';
+                html += '<div class="info-item"><div class="label">Submission ID</div><div class="value">#' + data.submission_id + '</div></div>';
+                html += '<div class="info-item"><div class="label">Grade</div><div class="value"><span class="grade-badge">' + (data.grade || '—') + '</span></div></div>';
+                html += '<div class="info-item"><div class="label">File Format</div><div class="value">🎵 ' + (data.file_format || '—') + '</div></div>';
+                html += '<div class="info-item"><div class="label">File Size</div><div class="value">' + (data.file_size || '—') + '</div></div>';
+                html += '<div class="info-item"><div class="label">Audio Duration</div><div class="value">⏱️ ' + (data.duration || '—') + '</div></div>';
+                html += '<div class="info-item"><div class="label">Word Count</div><div class="value">📝 ' + (data.word_count || '—') + ' words</div></div>';
+                html += '<div class="info-item"><div class="label">Evaluated By</div><div class="value">👨‍🏫 ' + (data.evaluator_name || 'Lecturer') + '</div></div>';
+                html += '<div class="info-item"><div class="label">Evaluation Date</div><div class="value">📅 ' + (data.evaluated_at || '—') + '</div></div>';
+                html += '</div>';
+                
+                // Remarks
+                if (data.remarks) {
+                    html += '<div class="remarks-box">';
+                    html += '<h4>💬 Lecturer Remarks</h4>';
+                    html += '<p>' + data.remarks.replace(/\n/g, '<br>') + '</p>';
+                    html += '</div>';
+                }
+                
+                // Poem text
+                if (data.ocr_text) {
+                    html += '<div class="remarks-box" style="border-left-color:#8b5cf6;background:#f8fafc;margin-top:10px;">';
+                    html += '<h4>📝 Poem Text</h4>';
+                    html += '<p style="white-space:pre-wrap;font-size:13px;line-height:1.8;">' + data.ocr_text.replace(/\n/g, '<br>') + '</p>';
+                    html += '</div>';
+                }
+                
+                html += '<hr class="divider">';
+                html += '<div class="footer-note">';
+                html += '<span>ℹ️ This evaluation is final. Contact your lecturer for any questions.</span>';
+                html += '</div>';
+                
+                content.innerHTML = html;
+                document.getElementById('popupTitle').textContent = '📊 Result for ' + (data.user_name || 'Student');
+                document.getElementById('popupSubtitle').textContent = '🎓 ' + (data.matric_no || '') + ' | Audio poetry evaluation';
+            })
+            .catch(error => {
+                content.innerHTML = '<div style="text-align:center;padding:40px;color:#dc2626;">❌ Error loading result: ' + error + '</div>';
+            });
+    }
+    
+    function closeResult() {
+        document.getElementById('resultPopup').classList.remove('active');
+    }
+    
+    // Close on click outside
+    document.getElementById('resultPopup').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeResult();
+        }
+    });
+    
+    // Close on Escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeResult();
+        }
+    });
+    
+    // Helper functions for result display
+    function getScoreColor(score) {
+        if (score === null) return "#94a3b8";
+        if (score >= 85) return "#16a34a";
+        if (score >= 70) return "#2563eb";
+        if (score >= 50) return "#d97706";
+        return "#dc2626";
+    }
+    
+    function getRatingText(score) {
+        if (score === null) return "Not Evaluated";
+        if (score >= 85) return "🌟 Excellent";
+        if (score >= 70) return "👍 Good";
+        if (score >= 50) return "📊 Average";
+        return "📈 Needs Improvement";
+    }
+    
+    function getStatusBadge(score) {
+        if (score === null) return "status-pending";
+        if (score >= 50) return "status-passed";
+        return "status-failed";
+    }
+    
+    function getStatusText(score) {
+        if (score === null) return "⏳ Pending";
+        if (score >= 50) return "✅ PASSED";
+        return "❌ FAILED";
     }
 
     document.addEventListener('DOMContentLoaded', function() {});
