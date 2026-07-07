@@ -221,6 +221,10 @@ function safeFileUrl($filepath) {
     return htmlspecialchars(normalizeFilePath($filepath));
 }
 
+function viewFileUrl($submissionId, $type) {
+    return 'view_file.php?id=' . urlencode($submissionId) . '&type=' . urlencode($type);
+}
+
 function getScoreClass($score) {
     if ($score === null) return "";
     if ($score >= 85) return "color: #16a34a; font-weight: 700;";
@@ -1011,9 +1015,9 @@ $has_active_filters = !empty($name) || !empty($matric) || !empty($format) || !em
                                     ?>
                                         <div class="audio-player-mini">
                                             <audio controls preload="none" style="max-width:80px;">
-                                                <source src="<?php echo safeFileUrl($audio_file); ?>">
+                                                <source src="<?php echo viewFileUrl($row['submission_id'], 'audio'); ?>">
                                             </audio>
-                                            <a href="<?php echo safeFileUrl($audio_file); ?>" target="_blank" class="file-item <?php echo $audio_class; ?>">
+                                            <a href="<?php echo viewFileUrl($row['submission_id'], 'audio'); ?>" target="_blank" class="file-item <?php echo $audio_class; ?>">
                                                 <span class="icon"><?php echo getFileIcon($audio_file); ?></span>
                                                 <span class="name"><?php echo htmlspecialchars(basename($audio_file)); ?></span>
                                                 <span class="size"><?php echo $audio_size; ?></span>
@@ -1027,7 +1031,7 @@ $has_active_filters = !empty($name) || !empty($matric) || !empty($format) || !em
                                     <?php } else { 
                                         $doc_class = 'doc-item';
                                     ?>
-                                        <a href="<?php echo safeFileUrl($doc_file); ?>" target="_blank" class="file-item <?php echo $doc_class; ?>">
+                                        <a href="<?php echo viewFileUrl($row['submission_id'], 'doc'); ?>" target="_blank" class="file-item <?php echo $doc_class; ?>">
                                             <span class="icon"><?php echo getFileIcon($doc_file); ?></span>
                                             <span class="name"><?php echo htmlspecialchars(basename($doc_file)); ?></span>
                                             <span class="size"><?php echo $doc_size; ?></span>
