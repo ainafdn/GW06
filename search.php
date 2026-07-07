@@ -135,22 +135,79 @@ function getFileIcon($filename) {
     return $icons[$ext] ?? '📎';
 }
 
+function normalizeFilePath($filepath) {
+    if (empty($filepath)) return '';
+
+    // Keep external URL as it is
+    if (filter_var($filepath, FILTER_VALIDATE_URL)) {
+        return $filepath;
+    }
+
+    // Clean Windows backslash if any
+    $filepath = str_replace('\\', '/', $filepath);
+
+    return $filepath;
+}
+
+function getLocalFilePath($filepath) {
+    if (empty($filepath)) return '';
+
+    $filepath = normalizeFilePath($filepath);
+
+    // URL cannot be checked with file_exists()
+    if (filter_var($filepath, FILTER_VALIDATE_URL)) {
+        return '';
+    }
+
+    // 1. Check as saved in database
+    if (file_exists($filepath)) {
+        return $filepath;
+    }
+
+    // 2. Check relative to this PHP file folder
+    $relativePath = __DIR__ . '/' . ltrim($filepath, '/');
+    if (file_exists($relativePath)) {
+        return $relativePath;
+    }
+
+    // 3. Check inside uploads folder using basename
+    $uploadPath = __DIR__ . '/uploads/' . basename($filepath);
+    if (file_exists($uploadPath)) {
+        return $uploadPath;
+    }
+
+    return '';
+}
+
 function getFileStatus($filepath) {
     if (empty($filepath)) return 'none';
-    if (file_exists($filepath)) {
-        $size = filesize($filepath);
-        if ($size > 0) {
-            return 'exists';
-        } else {
-            return 'empty';
-        }
+
+    $filepath = normalizeFilePath($filepath);
+
+    // Allow URL files to be clickable
+    if (filter_var($filepath, FILTER_VALIDATE_URL)) {
+        return 'exists';
     }
-    return 'missing';
+
+    $localPath = getLocalFilePath($filepath);
+
+    if (!empty($localPath)) {
+        $size = filesize($localPath);
+        return ($size > 0) ? 'exists' : 'empty';
+    }
+
+    // IMPORTANT: do not block the link just because file_exists() cannot find it.
+    // Some hosting paths work in browser even when PHP file_exists() fails.
+    return 'exists';
 }
 
 function getFileSizeHuman($filepath) {
-    if (empty($filepath) || !file_exists($filepath)) return '—';
-    $bytes = filesize($filepath);
+    if (empty($filepath)) return '—';
+
+    $localPath = getLocalFilePath($filepath);
+    if (empty($localPath)) return '—';
+
+    $bytes = filesize($localPath);
     if ($bytes == 0) return '0 KB';
     $kb = $bytes / 1024;
     if ($kb < 1024) {
@@ -158,6 +215,10 @@ function getFileSizeHuman($filepath) {
     } else {
         return round($kb / 1024, 2) . ' MB';
     }
+}
+
+function safeFileUrl($filepath) {
+    return htmlspecialchars(normalizeFilePath($filepath));
 }
 
 function getScoreClass($score) {
@@ -946,21 +1007,16 @@ $has_active_filters = !empty($name) || !empty($matric) || !empty($format) || !em
                                     <?php if ($audio_status == 'none') { ?>
                                         <span class="no-data">—</span>
                                     <?php } else { 
-                                        $audio_class = ($audio_status == 'exists') ? 'audio-item' : 'missing-item';
-                                        $status_label = ($audio_status == 'exists') ? '✅' : ($audio_status == 'empty' ? '⚠️' : '❌');
-                                        $status_text = ($audio_status == 'exists') ? 'exists' : ($audio_status == 'empty' ? 'empty' : 'missing');
+                                        $audio_class = 'audio-item';
                                     ?>
                                         <div class="audio-player-mini">
-                                            <?php if ($audio_status == 'exists') { ?>
-                                                <audio controls preload="none" style="max-width:80px;">
-                                                    <source src="<?php echo $audio_file; ?>">
-                                                </audio>
-                                            <?php } ?>
-                                            <a href="<?php echo $audio_file; ?>" target="_blank" class="file-item <?php echo $audio_class; ?>" <?php echo ($audio_status != 'exists') ? 'onclick="return false;"' : ''; ?>>
+                                            <audio controls preload="none" style="max-width:80px;">
+                                                <source src="<?php echo safeFileUrl($audio_file); ?>">
+                                            </audio>
+                                            <a href="<?php echo safeFileUrl($audio_file); ?>" target="_blank" class="file-item <?php echo $audio_class; ?>">
                                                 <span class="icon"><?php echo getFileIcon($audio_file); ?></span>
-                                                <span class="name"><?php echo basename($audio_file); ?></span>
+                                                <span class="name"><?php echo htmlspecialchars(basename($audio_file)); ?></span>
                                                 <span class="size"><?php echo $audio_size; ?></span>
-                                                <span class="status-badge-file <?php echo $status_text; ?>"><?php echo $status_label; ?></span>
                                             </a>
                                         </div>
                                     <?php } ?>
@@ -969,15 +1025,12 @@ $has_active_filters = !empty($name) || !empty($matric) || !empty($format) || !em
                                     <?php if ($doc_status == 'none') { ?>
                                         <span class="no-data">—</span>
                                     <?php } else { 
-                                        $doc_class = ($doc_status == 'exists') ? 'doc-item' : 'missing-item';
-                                        $status_label = ($doc_status == 'exists') ? '✅' : ($doc_status == 'empty' ? '⚠️' : '❌');
-                                        $status_text = ($doc_status == 'exists') ? 'exists' : ($doc_status == 'empty' ? 'empty' : 'missing');
+                                        $doc_class = 'doc-item';
                                     ?>
-                                        <a href="<?php echo $doc_file; ?>" target="_blank" class="file-item <?php echo $doc_class; ?>" <?php echo ($doc_status != 'exists') ? 'onclick="return false;"' : ''; ?>>
+                                        <a href="<?php echo safeFileUrl($doc_file); ?>" target="_blank" class="file-item <?php echo $doc_class; ?>">
                                             <span class="icon"><?php echo getFileIcon($doc_file); ?></span>
-                                            <span class="name"><?php echo basename($doc_file); ?></span>
+                                            <span class="name"><?php echo htmlspecialchars(basename($doc_file)); ?></span>
                                             <span class="size"><?php echo $doc_size; ?></span>
-                                            <span class="status-badge-file <?php echo $status_text; ?>"><?php echo $status_label; ?></span>
                                         </a>
                                     <?php } ?>
                                 </td>
