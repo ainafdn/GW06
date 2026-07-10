@@ -30,7 +30,7 @@ $dbPath = ($type === 'audio') ? $row['audio_file'] : $row['docStu'];
 // ============================================================
 function getFileUrl($dbPath) {
     // Base URL for your server
-    $base_url = "https://bitp3353.utem.edu.my/2026/a11/";
+    $base_url = "https://bitp3353.utem.edu.my/2026/all/";
     
     // Clean the path
     $path = trim((string)$dbPath);

@@ -9,7 +9,7 @@ include 'db.php';
 $user_name = "Lecturer";
 
 // BASE URL FOR FILES
-$base_url = "https://bitp3353.utem.edu.my/2026/a11/";
+$base_url = "https://bitp3353.utem.edu.my/2026/all/";
 
 // Get filter values
 $name = isset($_GET['student_name']) ? mysqli_real_escape_string($conn, trim($_GET['student_name'])) : '';
