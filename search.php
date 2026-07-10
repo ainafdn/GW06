@@ -8,6 +8,9 @@ include 'db.php';
 // Set default values (no session)
 $user_name = "Lecturer";
 
+// BASE URL FOR FILES
+$base_url = "https://bitp3353.utem.edu.my/2026/a11/";
+
 // Get filter values
 $name = isset($_GET['student_name']) ? mysqli_real_escape_string($conn, trim($_GET['student_name'])) : '';
 $matric = isset($_GET['matric_no']) ? mysqli_real_escape_string($conn, trim($_GET['matric_no'])) : '';
@@ -135,92 +138,10 @@ function getFileIcon($filename) {
     return $icons[$ext] ?? '📎';
 }
 
-function normalizeFilePath($filepath) {
-    if (empty($filepath)) return '';
+// REMOVED: normalizeFilePath, getLocalFilePath, getFileStatus, getFileSizeHuman, safeFileUrl
+// These functions are no longer needed for server deployment
 
-    // Keep external URL as it is
-    if (filter_var($filepath, FILTER_VALIDATE_URL)) {
-        return $filepath;
-    }
-
-    // Clean Windows backslash if any
-    $filepath = str_replace('\\', '/', $filepath);
-
-    return $filepath;
-}
-
-function getLocalFilePath($filepath) {
-    if (empty($filepath)) return '';
-
-    $filepath = normalizeFilePath($filepath);
-
-    // URL cannot be checked with file_exists()
-    if (filter_var($filepath, FILTER_VALIDATE_URL)) {
-        return '';
-    }
-
-    // 1. Check as saved in database
-    if (file_exists($filepath)) {
-        return $filepath;
-    }
-
-    // 2. Check relative to this PHP file folder
-    $relativePath = __DIR__ . '/' . ltrim($filepath, '/');
-    if (file_exists($relativePath)) {
-        return $relativePath;
-    }
-
-    // 3. Check inside uploads folder using basename
-    $uploadPath = __DIR__ . '/uploads/' . basename($filepath);
-    if (file_exists($uploadPath)) {
-        return $uploadPath;
-    }
-
-    return '';
-}
-
-function getFileStatus($filepath) {
-    if (empty($filepath)) return 'none';
-
-    $filepath = normalizeFilePath($filepath);
-
-    // Allow URL files to be clickable
-    if (filter_var($filepath, FILTER_VALIDATE_URL)) {
-        return 'exists';
-    }
-
-    $localPath = getLocalFilePath($filepath);
-
-    if (!empty($localPath)) {
-        $size = filesize($localPath);
-        return ($size > 0) ? 'exists' : 'empty';
-    }
-
-    // IMPORTANT: do not block the link just because file_exists() cannot find it.
-    // Some hosting paths work in browser even when PHP file_exists() fails.
-    return 'exists';
-}
-
-function getFileSizeHuman($filepath) {
-    if (empty($filepath)) return '—';
-
-    $localPath = getLocalFilePath($filepath);
-    if (empty($localPath)) return '—';
-
-    $bytes = filesize($localPath);
-    if ($bytes == 0) return '0 KB';
-    $kb = $bytes / 1024;
-    if ($kb < 1024) {
-        return round($kb, 2) . ' KB';
-    } else {
-        return round($kb / 1024, 2) . ' MB';
-    }
-}
-
-function safeFileUrl($filepath) {
-    return htmlspecialchars(normalizeFilePath($filepath));
-}
-
+// Simplified viewFileUrl - redirects through view_file.php
 function viewFileUrl($submissionId, $type) {
     return 'view_file.php?id=' . urlencode($submissionId) . '&type=' . urlencode($type);
 }
@@ -984,11 +905,9 @@ $has_active_filters = !empty($name) || !empty($matric) || !empty($format) || !em
                             $doc_file = $row['docStu'];
                             $file_size = $row['file_size_kb'];
                             
-                            // Check file status
-                            $audio_status = getFileStatus($audio_file);
-                            $doc_status = getFileStatus($doc_file);
-                            $audio_size = ($audio_status != 'none') ? getFileSizeHuman($audio_file) : '—';
-                            $doc_size = ($doc_status != 'none') ? getFileSizeHuman($doc_file) : '—';
+                            // Build file URLs
+                            $audio_url = $base_url . 'uploads/' . basename($audio_file);
+                            $doc_url = $base_url . 'uploads/' . basename($doc_file);
                             
                             if ($score !== null) {
                                 if ($score >= 85) $scoreClass = 'score-high';
@@ -1008,33 +927,27 @@ $has_active_filters = !empty($name) || !empty($matric) || !empty($format) || !em
                                     <span class="student-matric">🎓 <?php echo htmlspecialchars($row['matric_no']); ?></span>
                                 </td>
                                 <td>
-                                    <?php if ($audio_status == 'none') { ?>
+                                    <?php if (empty($audio_file)) { ?>
                                         <span class="no-data">—</span>
-                                    <?php } else { 
-                                        $audio_class = 'audio-item';
-                                    ?>
+                                    <?php } else { ?>
                                         <div class="audio-player-mini">
                                             <audio controls preload="none" style="max-width:80px;">
-                                                <source src="<?php echo viewFileUrl($row['submission_id'], 'audio'); ?>">
+                                                <source src="<?php echo htmlspecialchars($audio_url); ?>">
                                             </audio>
-                                            <a href="<?php echo viewFileUrl($row['submission_id'], 'audio'); ?>" target="_blank" class="file-item <?php echo $audio_class; ?>">
+                                            <a href="<?php echo htmlspecialchars($audio_url); ?>" target="_blank" class="file-item audio-item">
                                                 <span class="icon"><?php echo getFileIcon($audio_file); ?></span>
                                                 <span class="name"><?php echo htmlspecialchars(basename($audio_file)); ?></span>
-                                                <span class="size"><?php echo $audio_size; ?></span>
                                             </a>
                                         </div>
                                     <?php } ?>
                                 </td>
                                 <td>
-                                    <?php if ($doc_status == 'none') { ?>
+                                    <?php if (empty($doc_file)) { ?>
                                         <span class="no-data">—</span>
-                                    <?php } else { 
-                                        $doc_class = 'doc-item';
-                                    ?>
-                                        <a href="<?php echo viewFileUrl($row['submission_id'], 'doc'); ?>" target="_blank" class="file-item <?php echo $doc_class; ?>">
+                                    <?php } else { ?>
+                                        <a href="<?php echo htmlspecialchars($doc_url); ?>" target="_blank" class="file-item doc-item">
                                             <span class="icon"><?php echo getFileIcon($doc_file); ?></span>
                                             <span class="name"><?php echo htmlspecialchars(basename($doc_file)); ?></span>
-                                            <span class="size"><?php echo $doc_size; ?></span>
                                         </a>
                                     <?php } ?>
                                 </td>
